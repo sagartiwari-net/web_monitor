@@ -116,8 +116,9 @@ app.use('/api/auth', require('./routes/auth.routes'));     // ✅ Feature 2 — 
 app.use('/api/monitors', require('./routes/monitor.routes')); // ✅ Feature 3 — Monitor CRUD
 app.use('/api/logs', require('./routes/log.routes'));          // ✅ Feature 4 — Log History
 app.use('/api/audit', require('./routes/audit.routes'));       // ✅ Feature 6 — PageSpeed Audit
+app.use('/api/payment', require('./routes/payment.routes')); // ✅ Feature 8+9 — Payments
 // app.use('/api/chat', require('./routes/chat.routes'));         // ⏳ Feature 11
-// app.use('/api/admin', require('./routes/admin.routes'));       // ⏳ Feature 10
+app.use('/api/admin', require('./routes/admin.routes'));       // ✅ Feature 10 — Admin
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
