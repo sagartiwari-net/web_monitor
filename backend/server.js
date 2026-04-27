@@ -114,7 +114,7 @@ app.get('/health', (req, res) => {
 // Add new route files here as they are built.
 app.use('/api/auth', require('./routes/auth.routes'));     // ✅ Feature 2 — Auth
 app.use('/api/monitors', require('./routes/monitor.routes')); // ✅ Feature 3 — Monitor CRUD
-// app.use('/api/logs', require('./routes/log.routes'));         // ⏳ Feature 4
+app.use('/api/logs', require('./routes/log.routes'));          // ✅ Feature 4 — Log History
 // app.use('/api/payments', require('./routes/payment.routes')); // ⏳ Feature 8
 // app.use('/api/chat', require('./routes/chat.routes'));         // ⏳ Feature 11
 // app.use('/api/admin', require('./routes/admin.routes'));       // ⏳ Feature 10
@@ -173,9 +173,9 @@ const startServer = async () => {
   });
 
   // 3. Start cron jobs AFTER server is ready
-  // (Cron jobs will be imported here once built)
-  // require('./jobs/uptime.cron');
-  // require('./jobs/audit.cron');
+  const { startUptimeCron } = require('./jobs/uptime.cron');
+  startUptimeCron(); // ✅ Feature 4+5 — Uptime ping + AI root-cause
+  // require('./jobs/audit.cron'); // ⏳ Feature 7 — Daily SEO audit
 };
 
 startServer();
