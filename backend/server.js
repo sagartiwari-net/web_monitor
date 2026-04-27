@@ -113,7 +113,7 @@ app.get('/health', (req, res) => {
 // ─── API Routes ────────────────────────────────────────────────────────────────
 // Add new route files here as they are built.
 app.use('/api/auth', require('./routes/auth.routes'));     // ✅ Feature 2 — Auth
-// app.use('/api/monitors', require('./routes/monitor.routes')); // ⏳ Feature 3
+app.use('/api/monitors', require('./routes/monitor.routes')); // ✅ Feature 3 — Monitor CRUD
 // app.use('/api/logs', require('./routes/log.routes'));         // ⏳ Feature 4
 // app.use('/api/payments', require('./routes/payment.routes')); // ⏳ Feature 8
 // app.use('/api/chat', require('./routes/chat.routes'));         // ⏳ Feature 11
