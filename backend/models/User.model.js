@@ -115,29 +115,20 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ role: 1 });
 userSchema.index({ 'plan.status': 1 }); // For admin: find all pending plans
 
-// ─── Pre-save Hook: Hash Password ─────────────────────────────────────────────
+// ─── Pre-save Hook: Hash Password + Sync siteLimit ──────────────────────────────
 /**
- * Automatically hashes the password before saving to DB.
- * Only runs if the password field was actually modified
- * (prevents re-hashing on unrelated updates like email change).
+ * Combined pre-save hook (Mongoose v9 async style).
+ * 1. Hashes password only when modified
+ * 2. Syncs siteLimit when plan.type changes
  */
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  const salt = await bcrypt.genSalt(12); // Cost factor 12 — secure + fast enough
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
-
-// ─── Pre-save Hook: Sync siteLimit with plan.type ─────────────────────────────
-/**
- * When plan.type changes (e.g., admin upgrades user to 'pro'),
- * automatically update siteLimit to match the new plan.
- */
-userSchema.pre('save', function (next) {
+userSchema.pre('save', async function () {
+  if (this.isModified('password')) {
+    const salt = await bcrypt.genSalt(12); // Cost factor 12
+    this.password = await bcrypt.hash(this.password, salt);
+  }
   if (this.isModified('plan.type')) {
     this.plan.siteLimit = PLAN_SITE_LIMITS[this.plan.type] || 1;
   }
-  next();
 });
 
 // ─── Instance Methods ─────────────────────────────────────────────────────────

@@ -111,13 +111,13 @@ app.get('/health', (req, res) => {
 });
 
 // ─── API Routes ────────────────────────────────────────────────────────────────
-// Routes will be mounted here as they are built, e.g.:
-// app.use('/api/auth', require('./routes/auth.routes'));
-// app.use('/api/monitors', require('./routes/monitor.routes'));
-// app.use('/api/logs', require('./routes/log.routes'));
-// app.use('/api/payments', require('./routes/payment.routes'));
-// app.use('/api/chat', require('./routes/chat.routes'));
-// app.use('/api/admin', require('./routes/admin.routes'));
+// Add new route files here as they are built.
+app.use('/api/auth', require('./routes/auth.routes'));     // ✅ Feature 2 — Auth
+// app.use('/api/monitors', require('./routes/monitor.routes')); // ⏳ Feature 3
+// app.use('/api/logs', require('./routes/log.routes'));         // ⏳ Feature 4
+// app.use('/api/payments', require('./routes/payment.routes')); // ⏳ Feature 8
+// app.use('/api/chat', require('./routes/chat.routes'));         // ⏳ Feature 11
+// app.use('/api/admin', require('./routes/admin.routes'));       // ⏳ Feature 10
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
