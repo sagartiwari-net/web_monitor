@@ -112,14 +112,15 @@ app.get('/health', (req, res) => {
 
 // ─── API Routes ────────────────────────────────────────────────────────────────
 // Add new route files here as they are built.
-app.use('/api/auth', require('./routes/auth.routes'));              // ✅ Feature 2 — Auth + Password Reset
-app.use('/api/monitors', require('./routes/monitor.routes'));       // ✅ Feature 3 — Monitor CRUD
-app.use('/api/logs', require('./routes/log.routes'));               // ✅ Feature 4 — Log History
-app.use('/api/audit', require('./routes/audit.routes'));            // ✅ Feature 6 — PageSpeed Audit
-app.use('/api/payment', require('./routes/payment.routes'));        // ✅ Feature 8+9 — Payments
-app.use('/api/chat', require('./routes/chat.routes'));              // ✅ Feature 11 — AI Chatbot
-app.use('/api/admin', require('./routes/admin.routes'));            // ✅ Feature 10 — Admin + Settings
-app.use('/api/notifications', require('./routes/notification.routes')); // ✅ Feature 12 — Notifications
+app.use('/api/auth', require('./routes/auth.routes'));                          // ✅ Feature 2 — Auth
+app.use('/api/monitors', require('./routes/monitor.routes'));                   // ✅ Feature 3 — Monitors
+app.use('/api/logs', require('./routes/log.routes'));                           // ✅ Feature 4 — Logs
+app.use('/api/audit', require('./routes/audit.routes'));                        // ✅ Feature 6 — SEO Audit
+app.use('/api/payment', require('./routes/payment.routes'));                    // ✅ Feature 8+9 — Payments
+app.use('/api/chat', require('./routes/chat.routes'));                          // ✅ Feature 11 — AI Chatbot
+app.use('/api/admin', require('./routes/admin.routes'));                        // ✅ Feature 10 — Admin
+app.use('/api/admin/email-templates', require('./routes/emailTemplate.routes')); // ✅ Feature 12b — Email Templates
+app.use('/api/notifications', require('./routes/notification.routes'));         // ✅ Feature 12 — Notifications
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
@@ -195,7 +196,25 @@ const startServer = async () => {
     console.log('⚙️  Settings loaded from DB');
   }
 
-  // 4. Start cron jobs AFTER server is ready
+  // 4. Seed Email Templates — upsert all 12 default templates (never overwrites custom ones)
+  const EmailTemplate = require('./models/EmailTemplate.model');
+  const DEFAULT_TEMPLATES = require('./seeds/emailTemplate.seed');
+  let seededCount = 0;
+  for (const tpl of DEFAULT_TEMPLATES) {
+    const existing = await EmailTemplate.findOne({ key: tpl.key });
+    if (!existing) {
+      await EmailTemplate.create(tpl);
+      seededCount++;
+    }
+    // If already exists — skip (preserve admin customizations)
+  }
+  if (seededCount > 0) {
+    console.log(`📧  ${seededCount} default email template(s) seeded`);
+  } else {
+    console.log(`📧  Email templates loaded from DB (${DEFAULT_TEMPLATES.length} templates)`);
+  }
+
+  // 5. Start cron jobs AFTER server is ready
   const { startUptimeCron } = require('./jobs/uptime.cron');
   startUptimeCron(); // ✅ Feature 4+5 — Uptime ping + AI root-cause
   const { startAuditCron } = require('./jobs/audit.cron');

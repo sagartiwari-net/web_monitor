@@ -20,6 +20,26 @@
 
 const nodemailer = require('nodemailer');
 const Settings = require('../models/Settings.model');
+const EmailTemplate = require('../models/EmailTemplate.model');
+
+// ─── Placeholder Engine ───────────────────────────────────────────────────────
+/**
+ * Replaces {{placeholder}} tokens in a string with actual data values.
+ * Supports nested objects (e.g., {{plan.type}}) and safe rendering.
+ *
+ * @param {string} template - String with {{variable}} tokens
+ * @param {object} data - Key-value pairs to inject
+ * @returns {string} - Rendered string
+ */
+const renderTemplate = (template, data) => {
+  if (!template) return '';
+  return template.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+    const val = data[key];
+    if (val === null || val === undefined) return match; // keep placeholder if no value
+    if (val instanceof Date) return val.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST';
+    return String(val);
+  });
+};
 
 // ─── HTML Base Template ───────────────────────────────────────────────────────
 /**
@@ -308,14 +328,19 @@ const templates = {
 /**
  * Sends an email using the configured SMTP settings from the database.
  *
+ * Priority for template resolution:
+ *   1. DB EmailTemplate (isCustom=true — admin edited)
+ *   2. DB EmailTemplate (default seeded)
+ *   3. Hardcoded template function (last resort fallback)
+ *
  * @param {string} to - Recipient email address
- * @param {string} eventType - One of the template keys above
- * @param {object} data - Template data (name, urls, etc.)
+ * @param {string} eventType - One of the template keys (e.g., 'SITE_DOWN')
+ * @param {object} data - Template data ({ name, otp, siteName, ... })
  * @returns {Promise<{success: boolean, error?: string}>}
  */
 const sendEmail = async (to, eventType, data) => {
   try {
-    // 1. Load SMTP settings from DB (picks up any changes made in admin panel)
+    // 1. Load SMTP settings from DB
     const settings = await Settings.findOne({}).select('+smtpPass').lean();
 
     if (!settings || !settings.emailEnabled) {
@@ -328,37 +353,54 @@ const sendEmail = async (to, eventType, data) => {
       return { success: false, error: 'SMTP not configured' };
     }
 
-    // 2. Get template
-    const templateFn = templates[eventType];
-    if (!templateFn) {
-      console.error(`❌ Email: Unknown template type: ${eventType}`);
-      return { success: false, error: `Unknown template: ${eventType}` };
-    }
-
-    // 3. Inject global settings into template data
+    // 2. Build template data (inject global settings first, then event-specific data)
     const templateData = {
-      appName: settings.appName,
-      frontendUrl: settings.frontendUrl,
-      dashboardUrl: settings.frontendUrl,
+      appName: settings.appName || 'WebMonitor',
+      frontendUrl: settings.frontendUrl || 'http://localhost:3000',
+      dashboardUrl: settings.frontendUrl || 'http://localhost:3000',
       ...data,
+      // Format dates nicely if passed as Date objects
+      expiresAt: data.expiresAt ? new Date(data.expiresAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : undefined,
+      checkedAt: data.checkedAt ? new Date(data.checkedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) + ' IST' : undefined,
+      responseTime: data.responseTime ? `${data.responseTime}ms` : 'Timeout',
+      statusCode: data.statusCode || 'No Response',
+      aiRootCause: data.aiRootCause || 'No AI analysis available.',
+      adminNote: data.adminNote || 'No reason provided.',
+      plan: data.plan ? data.plan.toUpperCase() : undefined,
     };
 
-    const { subject, html } = templateFn(templateData);
+    let subject, html;
 
-    // 4. Create fresh transporter (reads latest DB settings)
+    // 3. Try DB template first (admin-customized takes highest priority)
+    const dbTemplate = await EmailTemplate.findOne({ key: eventType.toUpperCase(), isActive: true });
+
+    if (dbTemplate) {
+      // Use DB template with placeholder replacement
+      subject = renderTemplate(dbTemplate.subject, templateData);
+      html = renderTemplate(dbTemplate.html, templateData);
+      console.log(`📧 Using ${dbTemplate.isCustom ? 'custom' : 'default'} DB template [${eventType}]`);
+    } else {
+      // 4. Fall back to hardcoded template function
+      const templateFn = templates[eventType];
+      if (!templateFn) {
+        console.error(`❌ Email: No template found for: ${eventType}`);
+        return { success: false, error: `Unknown template: ${eventType}` };
+      }
+      ({ subject, html } = templateFn(templateData));
+      console.log(`📧 Using hardcoded template [${eventType}]`);
+    }
+
+    // 5. Create fresh transporter
     const transporter = nodemailer.createTransport({
       host: settings.smtpHost,
       port: settings.smtpPort,
       secure: settings.smtpSecure,
-      auth: {
-        user: settings.smtpUser,
-        pass: settings.smtpPass,
-      },
+      auth: { user: settings.smtpUser, pass: settings.smtpPass },
     });
 
-    // 5. Send email
+    // 6. Send email
     await transporter.sendMail({
-      from: `"${settings.fromName}" <${settings.fromEmail || settings.smtpUser}>`,
+      from: `"${settings.fromName || 'WebMonitor'}" <${settings.fromEmail || settings.smtpUser}>`,
       to,
       subject,
       html,
