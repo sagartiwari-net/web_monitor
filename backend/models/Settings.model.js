@@ -123,10 +123,20 @@ settingsSchema.statics.getSingleton = async function (includeSensitive = false) 
  * @param {object} updates - Fields to update
  */
 settingsSchema.statics.updateSettings = async function (updates) {
-  const settings = await this.findOne({});
-  if (!settings) throw new Error('Settings not initialized');
-  Object.assign(settings, updates);
-  await settings.save();
+  // Build $set object with dot notation for nested fields
+  // e.g. { pricing: { basic: 299 } } → { 'pricing.basic': 299 }
+  const setOps = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      // Flatten nested object to dot-notation
+      for (const [subKey, subVal] of Object.entries(value)) {
+        setOps[`${key}.${subKey}`] = subVal;
+      }
+    } else {
+      setOps[key] = value;
+    }
+  }
+  await this.findOneAndUpdate({}, { $set: setOps }, { new: true });
   return this.getSingleton(false);
 };
 

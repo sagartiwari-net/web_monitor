@@ -20,10 +20,10 @@ const bcrypt = require('bcryptjs');
 // ─── Plan Configuration ────────────────────────────────────────────────────────
 // Centralized plan limits — change here and it applies everywhere
 const PLAN_SITE_LIMITS = {
-  free: 1,    // Not a paid plan — just for newly registered users
-  basic: 3,
-  pro: 5,
-  elite: 15,
+  free: 1,    // Default for new users
+  basic: 3,   // ₹299/month
+  pro: 10,    // ₹599/month
+  elite: 20,  // ₹1499/month
 };
 
 // ─── Schema ───────────────────────────────────────────────────────────────────

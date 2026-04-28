@@ -335,13 +335,23 @@ const updateSettings = async (req, res) => {
     // Email SMTP
     'smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass',
     'fromName', 'fromEmail', 'emailEnabled',
+    // Telegram
     'telegramBotToken', 'telegramBotUsername', 'telegramEnabled',
+    // WhatsApp (future)
     'whatsappEnabled',
+    // AI — Gemini
+    'geminiApiKey', 'geminiModel',
+    // PageSpeed
+    'pagespeedApiKey',
+    // UPI
+    'upiId', 'upiPayeeName', 'upiEnabled',
+    // Plan pricing + limits (nested — handled by updateSettings dot-notation)
+    'pricing', 'planLimits',
   ];
 
   try {
     const updates = {};
-    for (const field of allowedFields) {
+    for (const field of ALLOWED) {        // ← was 'allowedFields' (bug fixed)
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     }
 
@@ -355,8 +365,10 @@ const updateSettings = async (req, res) => {
     return sendSuccess(res, 200, 'Settings updated successfully.', {
       settings: {
         ...updated,
-        smtpPass: updated?.smtpUser ? '••••••••' : null,
+        smtpPass:         updated?.smtpUser       ? '••••••••' : null,
         telegramBotToken: updated?.telegramEnabled ? '••••••••' : null,
+        geminiApiKey:     '••••••••',
+        pagespeedApiKey:  '••••••••',
       },
     });
   } catch (error) {
