@@ -26,6 +26,7 @@ const { validationResult } = require('express-validator');
 const Monitor = require('../models/Monitor.model');
 const { User } = require('../models/User.model');
 const { sendSuccess, sendError } = require('../utils/response.util');
+const { notify } = require('../services/notification.service');
 
 // ─── createMonitor ────────────────────────────────────────────────────────────
 /**
@@ -55,6 +56,12 @@ const createMonitor = async (req, res) => {
 
     // 4. Enforce plan site limit
     if (currentCount >= user.plan.siteLimit) {
+      // Notify user about limit (non-blocking)
+      notify(req.user._id, 'PLAN_LIMIT', {
+        currentPlan: user.plan.type,
+        siteLimit: user.plan.siteLimit,
+      }).catch(() => {});
+
       return sendError(
         res,
         403,

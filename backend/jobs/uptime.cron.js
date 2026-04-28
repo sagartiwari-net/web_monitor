@@ -32,6 +32,7 @@ const Monitor = require('../models/Monitor.model');
 const Log = require('../models/Log.model');
 const { pingUrl } = require('../services/uptime.service');
 const { generateRootCause } = require('../services/ai.service');
+const { notify } = require('../services/notification.service');
 
 // Prevent overlapping cron runs (if ping takes > 5 min for many sites)
 let isRunning = false;
@@ -80,20 +81,47 @@ const processMonitor = async (monitor) => {
 
   // 6. Sync AI analysis cache on monitor
   if (pingResult.status === 'DOWN' && logData.aiRootCause) {
-    // Cache the explanation on monitor for quick dashboard display
     monitorUpdate.lastAiAnalysis = logData.aiRootCause;
   } else if (pingResult.status === 'UP') {
-    // Site recovered — clear the stale DOWN analysis
     monitorUpdate.lastAiAnalysis = null;
   }
 
   await Monitor.findByIdAndUpdate(monitor._id, { $set: monitorUpdate });
 
-  // 7. Console log for visibility during development
+  // 7. Send notifications ONLY on status CHANGE (not every ping)
+  //    This prevents spamming user with emails on every 5-min check
+  const previousStatus = monitor.currentStatus; // 'UP' | 'DOWN' | 'UNKNOWN'
+  const currentStatus = pingResult.status;
+
+  if (previousStatus !== currentStatus) {
+    if (currentStatus === 'DOWN') {
+      // Site just went DOWN → alert user
+      notify(monitor.userId, 'SITE_DOWN', {
+        siteName: monitor.name,
+        siteUrl: monitor.url,
+        statusCode: pingResult.statusCode,
+        responseTime: pingResult.responseTime,
+        aiRootCause: logData.aiRootCause || null,
+        checkedAt: logData.checkedAt,
+      }).catch((e) => console.error('❌ DOWN notify failed:', e.message));
+
+    } else if (currentStatus === 'UP' && previousStatus === 'DOWN') {
+      // Site just recovered → recovery alert
+      notify(monitor.userId, 'SITE_UP', {
+        siteName: monitor.name,
+        siteUrl: monitor.url,
+        responseTime: pingResult.responseTime,
+        checkedAt: logData.checkedAt,
+      }).catch((e) => console.error('❌ UP notify failed:', e.message));
+    }
+  }
+
+  // 8. Console log for visibility during development
   const icon = pingResult.status === 'UP' ? '🟢' : '🔴';
+  const changed = previousStatus !== currentStatus ? ' [STATUS CHANGED]' : '';
   console.log(
     `${icon} [${new Date().toISOString()}] ${monitor.name} (${monitor.url}) ` +
-    `→ ${pingResult.status} | ${pingResult.responseTime}ms | HTTP ${pingResult.statusCode || 'N/A'}`
+    `→ ${pingResult.status} | ${pingResult.responseTime}ms | HTTP ${pingResult.statusCode || 'N/A'}${changed}`
   );
 };
 

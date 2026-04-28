@@ -14,12 +14,10 @@ const Payment = require('../models/Payment.model');
 const Coupon = require('../models/Coupon.model');
 const { User } = require('../models/User.model');
 const {
-  validatePlan,
-  validateCoupon,
-  calculateAmount,
-  generateUpiString,
+  validatePlan, validateCoupon, calculateAmount, generateUpiString,
 } = require('../services/payment.service');
 const { sendSuccess, sendError } = require('../utils/response.util');
+const { notify } = require('../services/notification.service');
 
 // ─── initiatePayment ──────────────────────────────────────────────────────────
 /**
@@ -171,10 +169,15 @@ const submitUtr = async (req, res) => {
 
     // 7. Increment coupon usedCount atomically (if coupon used)
     if (couponCheck.coupon) {
-      await Coupon.findByIdAndUpdate(couponCheck.coupon._id, {
-        $inc: { usedCount: 1 },
-      });
+      await Coupon.findByIdAndUpdate(couponCheck.coupon._id, { $inc: { usedCount: 1 } });
     }
+
+    // 8. Payment submitted confirmation via all enabled channels
+    notify(req.user._id, 'PAYMENT_SUBMITTED', {
+      plan,
+      finalAmount: amounts.finalAmount,
+      utrNumber: utrNumber.trim().toUpperCase(),
+    }).catch(() => {});
 
     return sendSuccess(res, 201, 'Payment submitted successfully. Admin will verify and activate your plan within 24 hours.', {
       payment: {

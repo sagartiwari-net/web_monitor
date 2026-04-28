@@ -163,6 +163,9 @@ const buildTelegramMessage = (eventType, data) => {
     case 'PLAN_LIMIT':
       return `🚧 *Monitor Limit Reached*\n\nYou've reached the limit of ${d.siteLimit} websites on your ${d.currentPlan} plan.\n\nUpgrade to add more websites.`;
 
+    case 'PAYMENT_SUBMITTED':
+      return `⏳ *Payment Received!*\n\n✅ Plan: ${d.plan?.toUpperCase()}\n💰 Amount: ₹${d.finalAmount}\n🔢 UTR: \`${d.utrNumber}\`\n\n_Admin will verify within 24 hours. You'll be notified._`;
+
     default:
       return `📢 *WebMonitor Notification*\n\nEvent: ${eventType}`;
   }

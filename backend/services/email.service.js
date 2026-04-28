@@ -282,7 +282,27 @@ const templates = {
     `, appName),
   }),
 
+  // 12. Payment Submitted Confirmation
+  PAYMENT_SUBMITTED: ({ name, plan, finalAmount, utrNumber, dashboardUrl, appName }) => ({
+    subject: `Payment received — awaiting verification 🕐`,
+    html: wrapEmail(`
+      ${h2(`Payment Submitted! ⏳`)}
+      ${p(`Hi ${name}, we've received your payment for the <strong style="color:#f1f5f9;">${plan}</strong> plan. Our admin team will verify it within <strong style="color:#f1f5f9;">24 hours</strong>.`)}
+      ${infoBox([
+        ['Plan', plan?.toUpperCase() || 'N/A'],
+        ['Amount Paid', `₹${finalAmount}`],
+        ['UTR Number', utrNumber],
+        ['Status', '⏳ Pending Verification'],
+      ])}
+      ${p(`You'll receive an email as soon as your payment is verified and your plan is activated.`)}
+      <div style="text-align:center;margin:24px 0;">
+        ${btn('Check Payment Status →', `${dashboardUrl}/billing`)}
+      </div>
+    `, appName),
+  }),
+
 };
+
 
 // ─── Core Send Function ───────────────────────────────────────────────────────
 /**
