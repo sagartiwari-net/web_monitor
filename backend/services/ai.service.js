@@ -2,31 +2,47 @@
  * @file ai.service.js
  * @description Gemini AI wrapper for root-cause analysis and chatbot.
  *
+ * ── DB-DRIVEN API KEY ─────────────────────────────────────────────────────────
+ * Gemini API key is read from Settings collection on EVERY call.
+ * Admin can change it from the admin panel without code restart.
+ * Falls back to process.env.GEMINI_API_KEY if DB key is not set.
+ *
  * Two functions exported:
  *
  * 1. generateRootCause(url, statusCode, errorMsg)
  *    → Called by uptime cron when a monitor goes DOWN
  *    → Returns a 2-sentence explanation for a non-technical user
- *    → Saved to Log.aiRootCause + Monitor.lastAiAnalysis
  *
- * 2. chatWithContext(userMessage, contextData)
+ * 2. chatWithContext(userMessage, monitorsWithLogs)
  *    → Called by the chat endpoint
- *    → contextData = user's monitors + recent logs injected into system prompt
+ *    → User's monitors + recent logs injected into system prompt
  *    → Returns Gemini's response string
- *    → Gives the AI full awareness of the user's actual website health data
  *
  * Error handling:
  *    Both functions return null on failure (never throw).
- *    The cron job and chat controller handle null gracefully.
  */
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Settings = require('../models/Settings.model');
 
-// Initialize Gemini client once — reused across all calls
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+/**
+ * Gets a fresh Gemini client using the latest API key from DB.
+ * Falls back to .env if DB key not set.
+ * @returns {{ model: GenerativeModel, modelName: string }}
+ */
+const getGeminiClient = async () => {
+  const settings = await Settings.getSingleton(true); // includeSensitive=true
+  const apiKey = settings?.geminiApiKey || process.env.GEMINI_API_KEY;
+  const modelName = settings?.geminiModel || 'gemini-2.5-flash';
 
-// Use gemini-2.5-flash — better free tier quota, fast and capable
-const MODEL_NAME = 'gemini-2.5-flash';
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured. Set it in Admin → Settings → AI.');
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: modelName });
+  return { model, modelName };
+};
 
 // ─── generateRootCause ────────────────────────────────────────────────────────
 /**
@@ -40,7 +56,7 @@ const MODEL_NAME = 'gemini-2.5-flash';
  */
 const generateRootCause = async (url, statusCode, errorMsg) => {
   try {
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    const { model } = await getGeminiClient();
 
     const prompt = `You are a web reliability expert helping a non-technical user understand why their website is down.
 
@@ -79,7 +95,7 @@ Explain the most likely cause of this downtime in exactly 2 short, simple senten
  */
 const chatWithContext = async (userMessage, monitorsWithLogs) => {
   try {
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    const { model } = await getGeminiClient();
 
     // Build the context section from real user data
     let contextSection = '';
@@ -128,7 +144,6 @@ ${contextSection}
 
 Now answer the user's question based on this data.`;
 
-    // Build the full prompt with system context + user message
     const fullPrompt = `${systemPrompt}\n\nUser's Question: ${userMessage}`;
 
     const result = await model.generateContent(fullPrompt);

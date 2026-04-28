@@ -299,21 +299,23 @@ const createCoupon = async (req, res) => {
 // ─── getSettings ──────────────────────────────────────────────────────────────
 /**
  * GET /api/admin/settings
- * Returns current app settings (sensitive fields masked).
+ * Returns all app settings. Sensitive keys masked (admin sees *** not actual value).
  */
 const getSettings = async (req, res) => {
   try {
     const settings = await Settings.getSingleton(false);
     if (!settings) return sendError(res, 404, 'Settings not found.', 'NOT_FOUND');
 
-    // Mask sensitive fields — admin sees they exist but not the value
-    return sendSuccess(res, 200, 'Settings fetched.', {
-      settings: {
-        ...settings,
-        smtpPass: settings.smtpUser ? '••••••••' : null,  // masked
-        telegramBotToken: settings.telegramEnabled ? '••••••••' : null, // masked
-      },
-    });
+    // Mask every sensitive field — admin sees they exist but not the actual value
+    const masked = {
+      ...settings,
+      smtpPass:        settings.smtpUser       ? '••••••••' : null,
+      telegramBotToken: settings.telegramEnabled ? '••••••••' : null,
+      geminiApiKey:    settings.geminiModel     ? '••••••••' : null,
+      pagespeedApiKey: settings.upiId           ? '••••••••' : null,
+    };
+
+    return sendSuccess(res, 200, 'Settings fetched.', { settings: masked });
   } catch (error) {
     console.error('❌ getSettings Error:', error.message);
     return sendError(res, 500, 'Could not fetch settings.', 'SERVER_ERROR');
@@ -323,12 +325,14 @@ const getSettings = async (req, res) => {
 // ─── updateSettings ───────────────────────────────────────────────────────────
 /**
  * PUT /api/admin/settings
- * Updates app settings. Partial update — only provided fields change.
- * Admin can update SMTP, Telegram token, app name/URL from dashboard.
+ * Updates any combination of settings. Admin-only.
+ * All infrastructure keys are DB-driven: SMTP, Telegram, Gemini, PageSpeed, UPI, Pricing.
  */
 const updateSettings = async (req, res) => {
-  const allowedFields = [
+  const ALLOWED = [
+    // App identity
     'appName', 'appUrl', 'frontendUrl',
+    // Email SMTP
     'smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass',
     'fromName', 'fromEmail', 'emailEnabled',
     'telegramBotToken', 'telegramBotUsername', 'telegramEnabled',

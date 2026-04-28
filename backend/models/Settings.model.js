@@ -3,25 +3,20 @@
  * @description Global app settings — DB-driven configuration.
  *
  * ── WHY DB-DRIVEN? ────────────────────────────────────────────────────────────
- * Instead of hardcoding SMTP credentials in .env (which requires code redeployment
- * to change), we store them in MongoDB. Admin can update via the admin panel
- * without touching any code or restarting the server.
+ * Admin changes any setting from the panel — no code change, no restart needed.
  *
  * ── SINGLETON PATTERN ────────────────────────────────────────────────────────
- * There is always exactly ONE Settings document.
- * On server start, if no document exists, it is seeded from .env values.
- * Always use: Settings.getSingleton() to read, Settings.updateSettings() to write.
+ * Always exactly ONE document. Use getSingleton() to read.
  *
  * ── WHAT IS STORED HERE ──────────────────────────────────────────────────────
- * - SMTP email settings (host, port, user, pass, from name)
- * - Telegram bot token + bot username
- * - WhatsApp placeholder (future)
- * - App name + URL (for email links)
- *
- * ── SECURITY ─────────────────────────────────────────────────────────────────
- * smtpPass and telegramBotToken are sensitive.
- * They are NOT returned in GET /api/admin/settings — only masked versions.
- * The admin must re-enter them to update.
+ * 1. App identity (name, URLs)
+ * 2. SMTP email settings
+ * 3. Telegram bot
+ * 4. WhatsApp (future)
+ * 5. AI — Gemini API key
+ * 6. PageSpeed API key
+ * 7. UPI payment details
+ * 8. Plan pricing (basic, pro, elite)
  */
 
 const mongoose = require('mongoose');
@@ -29,102 +24,96 @@ const mongoose = require('mongoose');
 const settingsSchema = new mongoose.Schema(
   {
     // ── App Identity ──────────────────────────────────────────────────────────
-    appName: {
-      type: String,
-      default: 'WebMonitor',
-    },
-    appUrl: {
-      type: String,
-      default: process.env.APP_URL || 'http://localhost:8000',
-      // Used in email links (e.g., "Click here to verify your email")
-    },
-    frontendUrl: {
-      type: String,
-      default: process.env.FRONTEND_URL || 'http://localhost:3000',
-      // Used for "Go to Dashboard" links in emails
-    },
+    appName: { type: String, default: 'WebMonitor' },
+    appUrl: { type: String, default: process.env.APP_URL || 'http://localhost:8000' },
+    frontendUrl: { type: String, default: process.env.FRONTEND_URL || 'http://localhost:3000' },
 
     // ── Email / SMTP ──────────────────────────────────────────────────────────
-    smtpHost: {
-      type: String,
-      default: 'smtp.gmail.com',
-    },
-    smtpPort: {
-      type: Number,
-      default: 587,
-    },
-    smtpSecure: {
-      type: Boolean,
-      default: false, // false for port 587 (STARTTLS), true for port 465 (SSL)
-    },
-    smtpUser: {
-      type: String,
-      default: null, // Seeded from EMAIL_USERNAME in .env
-    },
-    smtpPass: {
-      type: String,
-      default: null, // Seeded from EMAIL_PASSWORD in .env — never returned in API
-      select: false, // Hidden from GET queries by default
-    },
-    fromName: {
-      type: String,
-      default: 'WebMonitor',
-    },
-    fromEmail: {
-      type: String,
-      default: null, // Usually same as smtpUser
-    },
-    emailEnabled: {
-      type: Boolean,
-      default: true, // Master switch — disable all emails at once
-    },
+    smtpHost: { type: String, default: 'smtp.gmail.com' },
+    smtpPort: { type: Number, default: 587 },
+    smtpSecure: { type: Boolean, default: false }, // false=STARTTLS(587), true=SSL(465)
+    smtpUser: { type: String, default: null },
+    smtpPass: { type: String, default: null, select: false },
+    fromName: { type: String, default: 'WebMonitor' },
+    fromEmail: { type: String, default: null },
+    emailEnabled: { type: Boolean, default: true },
 
     // ── Telegram ──────────────────────────────────────────────────────────────
-    telegramBotToken: {
-      type: String,
-      default: null, // Set by admin from Telegram @BotFather
-      select: false, // Hidden from GET queries
-    },
-    telegramBotUsername: {
-      type: String,
-      default: null, // e.g. "@WebMonitorBot" — shown to users for setup
-    },
-    telegramEnabled: {
-      type: Boolean,
-      default: false, // Only enabled when bot token is set
-    },
+    telegramBotToken: { type: String, default: null, select: false },
+    telegramBotUsername: { type: String, default: null }, // e.g. '@WebMonitors_bot'
+    telegramEnabled: { type: Boolean, default: false },
 
     // ── WhatsApp (Future) ─────────────────────────────────────────────────────
-    whatsappEnabled: {
+    whatsappEnabled: { type: Boolean, default: false },
+    whatsappApiKey: { type: String, default: null, select: false },
+    whatsappPhoneId: { type: String, default: null },
+
+    // ── AI — Gemini ───────────────────────────────────────────────────────────
+    // Admin sets this from panel — no .env change needed
+    geminiApiKey: {
+      type: String,
+      default: null,
+      select: false, // Sensitive — hidden from GET
+    },
+    geminiModel: {
+      type: String,
+      default: 'gemini-2.5-flash',
+      // Admin can switch to gemini-1.5-pro etc.
+    },
+
+    // ── PageSpeed API ─────────────────────────────────────────────────────────
+    pagespeedApiKey: {
+      type: String,
+      default: null,
+      select: false, // Google API key — sensitive
+    },
+
+    // ── UPI Payment ───────────────────────────────────────────────────────────
+    upiId: {
+      type: String,
+      default: null,
+      // e.g. 'yourname@upi'
+    },
+    upiPayeeName: {
+      type: String,
+      default: 'WebMonitor',
+      // Shown in UPI apps
+    },
+    upiEnabled: {
       type: Boolean,
-      default: false,
+      default: true,
     },
-    whatsappApiKey: {
-      type: String,
-      default: null,
-      select: false,
+
+    // ── Plan Pricing (INR) ────────────────────────────────────────────────────
+    // Admin can change prices without code deployment
+    pricing: {
+      basic: { type: Number, default: 299 },   // 3 sites
+      pro: { type: Number, default: 599 },     // 5 sites
+      elite: { type: Number, default: 1499 },  // 15 sites
     },
-    whatsappPhoneId: {
-      type: String,
-      default: null,
+
+    // ── Plan Features (site limits) ───────────────────────────────────────────
+    // What each plan includes
+    planLimits: {
+      free: { type: Number, default: 1 },
+      basic: { type: Number, default: 3 },
+      pro: { type: Number, default: 5 },
+      elite: { type: Number, default: 15 },
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 // ─── Static Methods ───────────────────────────────────────────────────────────
 
 /**
  * Gets the singleton Settings document.
- * Always use this instead of findOne() directly.
- * @param {boolean} includeSensitive - Include smtpPass and telegramBotToken
+ * @param {boolean} includeSensitive - Include smtpPass, telegramBotToken, geminiApiKey, pagespeedApiKey
  */
 settingsSchema.statics.getSingleton = async function (includeSensitive = false) {
   const query = this.findOne({});
   if (includeSensitive) {
-    query.select('+smtpPass +telegramBotToken +whatsappApiKey');
+    query.select('+smtpPass +telegramBotToken +whatsappApiKey +geminiApiKey +pagespeedApiKey');
   }
   return query.lean();
 };
@@ -132,16 +121,12 @@ settingsSchema.statics.getSingleton = async function (includeSensitive = false) 
 /**
  * Updates settings. Partial update — only provided fields are changed.
  * @param {object} updates - Fields to update
- * @returns {Promise<object>} - Updated settings (without sensitive fields)
  */
 settingsSchema.statics.updateSettings = async function (updates) {
   const settings = await this.findOne({});
   if (!settings) throw new Error('Settings not initialized');
-
   Object.assign(settings, updates);
   await settings.save();
-
-  // Return without sensitive fields
   return this.getSingleton(false);
 };
 

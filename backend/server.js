@@ -190,6 +190,21 @@ const startServer = async () => {
       telegramEnabled: false,
       appUrl: process.env.APP_URL || `http://localhost:${PORT}`,
       frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+      // AI
+      geminiApiKey: process.env.GEMINI_API_KEY || null,
+      geminiModel: 'gemini-2.5-flash',
+      // PageSpeed
+      pagespeedApiKey: process.env.PAGESPEED_API_KEY || null,
+      // UPI
+      upiId: process.env.UPI_ID || null,
+      upiPayeeName: process.env.UPI_PAYEE_NAME || 'WebMonitor',
+      upiEnabled: true,
+      // Plan pricing (INR)
+      pricing: {
+        basic: parseInt(process.env.PRICE_BASIC) || 299,
+        pro: parseInt(process.env.PRICE_PRO) || 599,
+        elite: parseInt(process.env.PRICE_ELITE) || 1499,
+      },
     });
     console.log('⚙️  Settings seeded from .env (first run)');
   } else {

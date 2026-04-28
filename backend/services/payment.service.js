@@ -2,54 +2,60 @@
  * @file payment.service.js
  * @description Business logic for coupon validation and UPI payment initiation.
  *
+ * ── DB-DRIVEN PRICING & UPI ───────────────────────────────────────────────────
+ * Plan prices and UPI details are read from Settings collection.
+ * Admin can change prices from panel without code restart.
+ * Falls back to .env values if DB not configured.
+ *
  * ── PAYMENT FLOW ─────────────────────────────────────────────────────────────
- * Step 1: User calls POST /api/payment/initiate
- *   → Validates coupon (if provided)
- *   → Calculates originalAmount, discount, finalAmount
- *   → Returns UPI ID + amounts (NO Payment doc created yet)
- *
- * Step 2: User pays via UPI app → gets UTR number
- *
- * Step 3: User calls POST /api/payment/submit-utr
- *   → Creates Payment doc (status: 'pending')
- *   → Updates user plan.status = 'pending'
- *   → Increments coupon.usedCount (if coupon used)
- *
- * Step 4: Admin approves via POST /api/admin/payments/:id/approve
- *   → Updates Payment status = 'approved'
- *   → Updates User: plan.type, plan.status='active', plan.expiresAt
- *
- * ── PLAN PRICING (from .env) ─────────────────────────────────────────────────
- *   PRICE_BASIC=299  → basic plan (3 sites)
- *   PRICE_PRO=599    → pro plan (5 sites)
- *   PRICE_ELITE=1499 → elite plan (15 sites)
+ * Step 1: POST /api/payment/initiate  → validate coupon, calculate amount, return UPI
+ * Step 2: User pays via UPI → gets UTR number
+ * Step 3: POST /api/payment/submit-utr → create Payment doc (status: 'pending')
+ * Step 4: Admin approves → update plan
  */
 
 const Coupon = require('../models/Coupon.model');
+const Settings = require('../models/Settings.model');
 
-// Plan prices loaded from .env
-const PLAN_PRICES = {
-  basic: parseInt(process.env.PRICE_BASIC) || 299,
-  pro: parseInt(process.env.PRICE_PRO) || 599,
-  elite: parseInt(process.env.PRICE_ELITE) || 1499,
+// Valid plan names — these never change
+const VALID_PLANS = ['basic', 'pro', 'elite'];
+
+/**
+ * Gets plan prices from DB Settings. Falls back to .env / hardcoded defaults.
+ * Called fresh on each payment initiation so admin price changes take effect immediately.
+ */
+const getPricing = async () => {
+  const settings = await Settings.getSingleton(false);
+  return {
+    basic: settings?.pricing?.basic ?? parseInt(process.env.PRICE_BASIC) ?? 299,
+    pro:   settings?.pricing?.pro   ?? parseInt(process.env.PRICE_PRO)   ?? 599,
+    elite: settings?.pricing?.elite ?? parseInt(process.env.PRICE_ELITE) ?? 1499,
+  };
 };
 
-// Valid plan names
-const VALID_PLANS = ['basic', 'pro', 'elite'];
+/**
+ * Gets UPI details from DB Settings. Falls back to .env defaults.
+ */
+const getUpiDetails = async () => {
+  const settings = await Settings.getSingleton(false);
+  return {
+    upiId:      settings?.upiId      || process.env.UPI_ID       || '',
+    payeeName:  settings?.upiPayeeName || process.env.UPI_PAYEE_NAME || 'WebMonitor',
+    upiEnabled: settings?.upiEnabled !== false,
+  };
+};
 
 /**
  * Validates a plan name.
  * @param {string} plan
+ * @param {object} prices - From getPricing()
  * @returns {{ valid: boolean, price?: number, error?: string }}
  */
-const validatePlan = (plan) => {
+const validatePlan = (plan, prices) => {
   if (!VALID_PLANS.includes(plan)) {
-    return {
-      valid: false,
-      error: `Invalid plan. Choose from: ${VALID_PLANS.join(', ')}`,
-    };
+    return { valid: false, error: `Invalid plan. Choose from: ${VALID_PLANS.join(', ')}` };
   }
-  return { valid: true, price: PLAN_PRICES[plan] };
+  return { valid: true, price: prices[plan] };
 };
 
 /**
@@ -58,7 +64,6 @@ const validatePlan = (plan) => {
  *
  * @param {string} code - Coupon code (case-insensitive)
  * @param {string} plan - Plan being purchased
- * @returns {Promise<{ valid: boolean, coupon?: object, error?: string }>}
  */
 const validateCoupon = async (code, plan) => {
   if (!code) return { valid: true, coupon: null };
@@ -69,17 +74,14 @@ const validateCoupon = async (code, plan) => {
   if (!coupon) return { valid: false, error: 'Coupon code not found.' };
   if (!coupon.isActive) return { valid: false, error: 'This coupon is no longer active.' };
 
-  // Check validity period
   if (coupon.validUntil && new Date() > coupon.validUntil) {
     return { valid: false, error: 'This coupon has expired.' };
   }
 
-  // Check usage limit (null = unlimited)
   if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) {
     return { valid: false, error: 'This coupon has reached its usage limit.' };
   }
 
-  // Check plan eligibility
   if (coupon.applicablePlans.length > 0 && !coupon.applicablePlans.includes(plan)) {
     return {
       valid: false,
@@ -91,11 +93,7 @@ const validateCoupon = async (code, plan) => {
 };
 
 /**
- * Calculates the final payment amount after discount.
- *
- * @param {number} originalAmount - Full plan price in INR
- * @param {object|null} coupon - Coupon document (null if no coupon)
- * @returns {{ originalAmount, discountPercent, discountAmount, finalAmount }}
+ * Calculates the final payment amount after coupon discount.
  */
 const calculateAmount = (originalAmount, coupon) => {
   let discountPercent = 0;
@@ -106,7 +104,7 @@ const calculateAmount = (originalAmount, coupon) => {
       discountPercent = coupon.discountValue;
       discountAmount = Math.round((originalAmount * discountPercent) / 100);
     } else if (coupon.discountType === 'fixed') {
-      discountAmount = Math.min(coupon.discountValue, originalAmount); // can't go negative
+      discountAmount = Math.min(coupon.discountValue, originalAmount);
       discountPercent = Math.round((discountAmount / originalAmount) * 100);
     }
   }
@@ -120,21 +118,19 @@ const calculateAmount = (originalAmount, coupon) => {
 };
 
 /**
- * Generates a UPI payment string (deep link format).
- * When opened on mobile, launches UPI apps (GPay, PhonePe, Paytm) directly.
- *
- * Format: upi://pay?pa=<id>&pn=<name>&am=<amount>&cu=INR&tn=<note>
+ * Generates a UPI payment deep link.
+ * UPI details read from DB Settings.
  *
  * @param {number} amount - Final amount to pay
- * @param {string} plan - Plan name (for transaction note)
+ * @param {string} plan - Plan name
  * @param {string} userId - User ID (for reference)
- * @returns {string} UPI deep link
  */
-const generateUpiString = (amount, plan, userId) => {
+const generateUpiString = async (amount, plan, userId) => {
+  const upi = await getUpiDetails();
   const note = `WebMonitor ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan - ${userId}`;
   const params = new URLSearchParams({
-    pa: process.env.UPI_ID,
-    pn: process.env.UPI_PAYEE_NAME,
+    pa: upi.upiId,
+    pn: upi.payeeName,
     am: amount.toString(),
     cu: 'INR',
     tn: note,
@@ -146,7 +142,8 @@ module.exports = {
   validatePlan,
   validateCoupon,
   calculateAmount,
-  generateUpiString,
-  PLAN_PRICES,
+  generateUpiString, // now async — returns Promise<string>
+  getPricing,
+  getUpiDetails,
   VALID_PLANS,
 };

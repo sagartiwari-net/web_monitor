@@ -30,6 +30,29 @@ const Settings = require('../models/Settings.model');
 const { sendEmail } = require('./email.service');
 const { sendTelegram, buildTelegramMessage } = require('./telegram.service');
 
+// ─── Channel Routing Rules ──────────────────────────────────────────────────────────────
+//
+// EMAIL ONLY events — sensitive auth events that should NOT go to Telegram:
+//   WELCOME, EMAIL_VERIFIED, FORGOT_PASSWORD, PASSWORD_CHANGED
+//   Reason: OTP in Telegram chat history is a security risk
+//
+// TELEGRAM + EMAIL events — operational alerts the user wants on both:
+//   SITE_DOWN, SITE_UP, PLAN_ACTIVATED, PAYMENT_REJECTED,
+//   PLAN_EXPIRING, PLAN_EXPIRED, PLAN_LIMIT, PAYMENT_SUBMITTED
+//
+// Future: WhatsApp will follow same whitelist as Telegram
+
+const TELEGRAM_ALLOWED_EVENTS = new Set([
+  'SITE_DOWN',
+  'SITE_UP',
+  'PLAN_ACTIVATED',
+  'PAYMENT_REJECTED',
+  'PLAN_EXPIRING',
+  'PLAN_EXPIRED',
+  'PLAN_LIMIT',
+  'PAYMENT_SUBMITTED',
+]);
+
 /**
  * Main notification dispatcher.
  *
@@ -58,7 +81,7 @@ const notify = async (userId, eventType, data = {}) => {
     // 4. Send to each channel in parallel (fire and forget per channel)
     const sends = [];
 
-    // ── Email ────────────────────────────────────────────────────────────────
+    // ── Email (all events) ──────────────────────────────────────────────────────────────
     if (user.notifications?.email !== false) { // default true
       sends.push(
         sendEmail(user.email, eventType, fullData)
@@ -67,8 +90,12 @@ const notify = async (userId, eventType, data = {}) => {
       );
     }
 
-    // ── Telegram ─────────────────────────────────────────────────────────────
-    if (user.notifications?.telegram && user.telegramChatId) {
+    // ── Telegram (monitoring + billing events only — NO auth/OTP events) ─────────────
+    if (
+      TELEGRAM_ALLOWED_EVENTS.has(eventType) &&  // only allowed events
+      user.notifications?.telegram &&             // user opted in
+      user.telegramChatId                         // user connected their account
+    ) {
       const message = buildTelegramMessage(eventType, fullData);
       sends.push(
         sendTelegram(user.telegramChatId, message)
@@ -77,9 +104,9 @@ const notify = async (userId, eventType, data = {}) => {
       );
     }
 
-    // ── WhatsApp (Future) ─────────────────────────────────────────────────────
-    // if (user.notifications?.whatsapp && user.whatsappNumber) {
-    //   sends.push(sendWhatsApp(user.whatsappNumber, buildWhatsAppMessage(eventType, fullData)));
+    // ── WhatsApp (future — same whitelist as Telegram) ─────────────────────────
+    // if (TELEGRAM_ALLOWED_EVENTS.has(eventType) && user.notifications?.whatsapp && user.whatsappNumber) {
+    //   sends.push(sendWhatsApp(...));
     // }
 
     // Wait for all channels (but don't block caller — use .catch on the whole thing)

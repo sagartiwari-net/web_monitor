@@ -14,7 +14,7 @@ const Payment = require('../models/Payment.model');
 const Coupon = require('../models/Coupon.model');
 const { User } = require('../models/User.model');
 const {
-  validatePlan, validateCoupon, calculateAmount, generateUpiString,
+  validatePlan, validateCoupon, calculateAmount, generateUpiString, getPricing,
 } = require('../services/payment.service');
 const { sendSuccess, sendError } = require('../utils/response.util');
 const { notify } = require('../services/notification.service');
@@ -39,23 +39,28 @@ const initiatePayment = async (req, res) => {
   const { plan, couponCode } = req.body;
 
   try {
-    // 1. Validate plan
-    const planCheck = validatePlan(plan);
+    // 1. Load pricing from DB Settings
+    const prices = await getPricing();
+
+    // 2. Validate plan against DB prices
+    const planCheck = validatePlan(plan, prices);
     if (!planCheck.valid) {
       return sendError(res, 400, planCheck.error, 'INVALID_PLAN');
     }
 
-    // 2. Validate coupon (if provided)
+    // 3. Validate coupon (if provided)
     const couponCheck = await validateCoupon(couponCode, plan);
     if (!couponCheck.valid) {
       return sendError(res, 400, couponCheck.error, 'INVALID_COUPON');
     }
 
-    // 3. Calculate amounts
+    // 4. Calculate amounts
     const amounts = calculateAmount(planCheck.price, couponCheck.coupon);
 
-    // 4. Generate UPI deep link
-    const upiString = generateUpiString(amounts.finalAmount, plan, req.user._id.toString());
+    // 5. Generate UPI deep link (reads UPI details from DB)
+    const upiString = await generateUpiString(amounts.finalAmount, plan, req.user._id.toString());
+    const { getUpiDetails } = require('../services/payment.service');
+    const upiDetails = await getUpiDetails();
 
     return sendSuccess(res, 200, 'Payment details ready. Complete UPI payment and submit UTR.', {
       plan,
@@ -67,17 +72,15 @@ const initiatePayment = async (req, res) => {
         currency: 'INR',
       },
       upi: {
-        id: process.env.UPI_ID,
-        payeeName: process.env.UPI_PAYEE_NAME,
-        upiString,     // Deep link — opens UPI apps on mobile
+        id: upiDetails.upiId,
+        payeeName: upiDetails.payeeName,
+        upiString,
         qrNote: `Pay ₹${amounts.finalAmount} for WebMonitor ${plan} plan`,
       },
-      coupon: couponCheck.coupon
-        ? {
-            code: couponCheck.coupon.code,
-            discountPercent: couponCheck.coupon.discountPercent,
-          }
-        : null,
+      coupon: couponCheck.coupon ? {
+        code: couponCheck.coupon.code,
+        discountPercent: couponCheck.coupon.discountPercent,
+      } : null,
       nextStep: 'Pay via UPI, then call POST /api/payment/submit-utr with your UTR number.',
     });
 
@@ -119,8 +122,9 @@ const submitUtr = async (req, res) => {
       );
     }
 
-    // 2. Re-validate plan
-    const planCheck = validatePlan(plan);
+    // 2. Re-validate plan using DB prices
+    const prices = await getPricing();
+    const planCheck = validatePlan(plan, prices);
     if (!planCheck.valid) {
       return sendError(res, 400, planCheck.error, 'INVALID_PLAN');
     }
@@ -143,9 +147,9 @@ const submitUtr = async (req, res) => {
         couponCode: couponCheck.coupon?.code || null,
         couponId: couponCheck.coupon?._id || null,
         originalAmount: amounts.originalAmount,
-        discountApplied: amounts.discountAmount,   // schema field = discountApplied
+        discountApplied: amounts.discountAmount,
         finalAmount: amounts.finalAmount,
-        upiId: process.env.UPI_ID,                 // required field
+        upiId: (await require('../services/payment.service').getUpiDetails()).upiId,
         utrNumber: utrNumber.trim().toUpperCase(),
         status: 'pending',
       });
