@@ -26,7 +26,9 @@ const { validationResult } = require('express-validator');
 const Payment = require('../models/Payment.model');
 const { User, PLAN_SITE_LIMITS } = require('../models/User.model');
 const Coupon = require('../models/Coupon.model');
+const Settings = require('../models/Settings.model');
 const { sendSuccess, sendError } = require('../utils/response.util');
+const { notify } = require('../services/notification.service');
 
 // ─── listPendingPayments ──────────────────────────────────────────────────────
 /**
@@ -135,6 +137,11 @@ const approvePayment = async (req, res) => {
       'plan.expiresAt': expiresAt,
     });
 
+    // Notify user of plan activation
+    notify(payment.userId, 'PLAN_ACTIVATED', {
+      plan: newPlan, siteLimit: newSiteLimit, expiresAt,
+    }).catch(() => {});
+
     console.log(`✅ Admin ${req.user._id} approved payment ${payment._id} → User ${payment.userId} now on ${newPlan} plan`);
 
     return sendSuccess(res, 200, `Payment approved. User's ${newPlan} plan is now active until ${expiresAt.toISOString()}.`, {
@@ -192,17 +199,17 @@ const rejectPayment = async (req, res) => {
     await payment.save();
 
     // Reset user's plan.status back to inactive
-    await User.findByIdAndUpdate(payment.userId, {
-      'plan.status': 'inactive',
-    });
+    await User.findByIdAndUpdate(payment.userId, { 'plan.status': 'inactive' });
 
     // Decrement coupon usedCount if a coupon was applied (rollback)
     if (payment.couponCode) {
-      await Coupon.findOneAndUpdate(
-        { code: payment.couponCode },
-        { $inc: { usedCount: -1 } }
-      );
+      await Coupon.findOneAndUpdate({ code: payment.couponCode }, { $inc: { usedCount: -1 } });
     }
+
+    // Notify user of rejection
+    notify(payment.userId, 'PAYMENT_REJECTED', {
+      plan: payment.plan, adminNote,
+    }).catch(() => {});
 
     console.log(`❌ Admin ${req.user._id} rejected payment ${payment._id}`);
 
@@ -289,6 +296,71 @@ const createCoupon = async (req, res) => {
   }
 };
 
+// ─── getSettings ──────────────────────────────────────────────────────────────
+/**
+ * GET /api/admin/settings
+ * Returns current app settings (sensitive fields masked).
+ */
+const getSettings = async (req, res) => {
+  try {
+    const settings = await Settings.getSingleton(false);
+    if (!settings) return sendError(res, 404, 'Settings not found.', 'NOT_FOUND');
+
+    // Mask sensitive fields — admin sees they exist but not the value
+    return sendSuccess(res, 200, 'Settings fetched.', {
+      settings: {
+        ...settings,
+        smtpPass: settings.smtpUser ? '••••••••' : null,  // masked
+        telegramBotToken: settings.telegramEnabled ? '••••••••' : null, // masked
+      },
+    });
+  } catch (error) {
+    console.error('❌ getSettings Error:', error.message);
+    return sendError(res, 500, 'Could not fetch settings.', 'SERVER_ERROR');
+  }
+};
+
+// ─── updateSettings ───────────────────────────────────────────────────────────
+/**
+ * PUT /api/admin/settings
+ * Updates app settings. Partial update — only provided fields change.
+ * Admin can update SMTP, Telegram token, app name/URL from dashboard.
+ */
+const updateSettings = async (req, res) => {
+  const allowedFields = [
+    'appName', 'appUrl', 'frontendUrl',
+    'smtpHost', 'smtpPort', 'smtpSecure', 'smtpUser', 'smtpPass',
+    'fromName', 'fromEmail', 'emailEnabled',
+    'telegramBotToken', 'telegramBotUsername', 'telegramEnabled',
+    'whatsappEnabled',
+  ];
+
+  try {
+    const updates = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return sendError(res, 400, 'No valid fields provided to update.', 'VALIDATION_ERROR');
+    }
+
+    const updated = await Settings.updateSettings(updates);
+    console.log(`⚙️ Admin ${req.user._id} updated settings:`, Object.keys(updates).join(', '));
+
+    return sendSuccess(res, 200, 'Settings updated successfully.', {
+      settings: {
+        ...updated,
+        smtpPass: updated?.smtpUser ? '••••••••' : null,
+        telegramBotToken: updated?.telegramEnabled ? '••••••••' : null,
+      },
+    });
+  } catch (error) {
+    console.error('❌ updateSettings Error:', error.message);
+    return sendError(res, 500, 'Could not update settings.', 'SERVER_ERROR');
+  }
+};
+
 module.exports = {
   listPendingPayments,
   listAllPayments,
@@ -296,4 +368,6 @@ module.exports = {
   rejectPayment,
   listUsers,
   createCoupon,
+  getSettings,
+  updateSettings,
 };

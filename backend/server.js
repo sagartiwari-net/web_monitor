@@ -112,13 +112,14 @@ app.get('/health', (req, res) => {
 
 // ─── API Routes ────────────────────────────────────────────────────────────────
 // Add new route files here as they are built.
-app.use('/api/auth', require('./routes/auth.routes'));     // ✅ Feature 2 — Auth
-app.use('/api/monitors', require('./routes/monitor.routes')); // ✅ Feature 3 — Monitor CRUD
-app.use('/api/logs', require('./routes/log.routes'));          // ✅ Feature 4 — Log History
-app.use('/api/audit', require('./routes/audit.routes'));       // ✅ Feature 6 — PageSpeed Audit
-app.use('/api/payment', require('./routes/payment.routes')); // ✅ Feature 8+9 — Payments
-app.use('/api/chat', require('./routes/chat.routes'));         // ✅ Feature 11 — AI Chatbot
-app.use('/api/admin', require('./routes/admin.routes'));       // ✅ Feature 10 — Admin
+app.use('/api/auth', require('./routes/auth.routes'));              // ✅ Feature 2 — Auth + Password Reset
+app.use('/api/monitors', require('./routes/monitor.routes'));       // ✅ Feature 3 — Monitor CRUD
+app.use('/api/logs', require('./routes/log.routes'));               // ✅ Feature 4 — Log History
+app.use('/api/audit', require('./routes/audit.routes'));            // ✅ Feature 6 — PageSpeed Audit
+app.use('/api/payment', require('./routes/payment.routes'));        // ✅ Feature 8+9 — Payments
+app.use('/api/chat', require('./routes/chat.routes'));              // ✅ Feature 11 — AI Chatbot
+app.use('/api/admin', require('./routes/admin.routes'));            // ✅ Feature 10 — Admin + Settings
+app.use('/api/notifications', require('./routes/notification.routes')); // ✅ Feature 12 — Notifications
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((req, res) => {
@@ -173,11 +174,34 @@ const startServer = async () => {
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}\n`);
   });
 
-  // 3. Start cron jobs AFTER server is ready
+  // 3. Seed Settings (DB-driven config) — only on first run
+  const Settings = require('./models/Settings.model');
+  const existingSettings = await Settings.findOne({});
+  if (!existingSettings) {
+    await Settings.create({
+      smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+      smtpPort: parseInt(process.env.SMTP_PORT) || 587,
+      smtpUser: process.env.EMAIL_USERNAME || null,
+      smtpPass: process.env.EMAIL_PASSWORD || null,
+      fromName: process.env.SMTP_FROM_NAME || 'WebMonitor',
+      fromEmail: process.env.EMAIL_USERNAME || null,
+      emailEnabled: true,
+      telegramEnabled: false,
+      appUrl: process.env.APP_URL || `http://localhost:${PORT}`,
+      frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+    });
+    console.log('⚙️  Settings seeded from .env (first run)');
+  } else {
+    console.log('⚙️  Settings loaded from DB');
+  }
+
+  // 4. Start cron jobs AFTER server is ready
   const { startUptimeCron } = require('./jobs/uptime.cron');
   startUptimeCron(); // ✅ Feature 4+5 — Uptime ping + AI root-cause
   const { startAuditCron } = require('./jobs/audit.cron');
   startAuditCron(); // ✅ Feature 7 — Daily SEO audit cron
+  const { startExpiryCron } = require('./jobs/expiry.cron');
+  startExpiryCron(); // ✅ Feature 12 — Plan expiry checker
 };
 
 startServer();

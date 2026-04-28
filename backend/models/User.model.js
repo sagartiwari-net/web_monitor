@@ -100,7 +100,55 @@ const userSchema = new mongoose.Schema(
     // ── Account Status ────────────────────────────────────────────────────────
     isEmailVerified: {
       type: Boolean,
-      default: false,  // Reserved for future email verification feature
+      default: false,
+    },
+
+    // ── Email Verification ────────────────────────────────────────────────────
+    emailVerificationToken: {
+      type: String,
+      default: null,
+      select: false, // Never returned in API responses
+    },
+    emailVerificationExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+
+    // ── Password Reset (OTP) ──────────────────────────────────────────────────
+    passwordResetOtp: {
+      type: String,
+      default: null,
+      select: false, // Never returned in API responses
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+
+    // ── Telegram ──────────────────────────────────────────────────────────────
+    telegramChatId: {
+      type: String,
+      default: null,
+      // Set when user connects Telegram via /api/notifications/telegram/connect
+    },
+
+    // ── Notification Preferences ──────────────────────────────────────────────
+    notifications: {
+      email: {
+        type: Boolean,
+        default: true, // Email ON by default
+      },
+      telegram: {
+        type: Boolean,
+        default: false, // Telegram OFF until user connects
+      },
+      // WhatsApp (future — placeholder)
+      whatsapp: {
+        type: Boolean,
+        default: false,
+      },
     },
   },
   {

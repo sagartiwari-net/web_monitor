@@ -16,12 +16,8 @@
 const express = require('express');
 const { body } = require('express-validator');
 const {
-  listPendingPayments,
-  listAllPayments,
-  approvePayment,
-  rejectPayment,
-  listUsers,
-  createCoupon,
+  listPendingPayments, listAllPayments, approvePayment, rejectPayment,
+  listUsers, createCoupon, getSettings, updateSettings,
 } = require('../controllers/admin.controller');
 const { protect, adminOnly } = require('../middleware/auth.middleware');
 
@@ -226,5 +222,9 @@ router.get('/users', listUsers);
  *         description: Coupon code already exists
  */
 router.post('/coupons', couponValidation, createCoupon);
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+router.get('/settings', getSettings);      // Get current SMTP, Telegram config
+router.put('/settings', updateSettings);   // Update SMTP, Telegram, app info
 
 module.exports = router;
