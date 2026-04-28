@@ -32,11 +32,28 @@ const app = express();
 app.use(express.json({ limit: '10kb' })); // Limit body size for security
 
 // CORS — Allow frontend to communicate with this backend
+const ALLOWED_ORIGINS = [
+  process.env.FRONTEND_URL,          // https://webelearners.in (production)
+  'https://test.webelearners.in',    // Test UI subdomain
+  'https://webelearners.in',         // Main domain
+  'http://localhost:3000',           // Local dev
+  'http://localhost:5173',           // Vite dev
+  'http://127.0.0.1:5500',          // VS Code Live Server
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || '*', // Set FRONTEND_URL in .env for production
+    origin: (origin, callback) => {
+      // Allow requests with no origin (Postman, mobile apps, curl)
+      if (!origin) return callback(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+      // Also allow any subdomain of webelearners.in
+      if (/^https?:\/\/([a-z0-9-]+\.)?webelearners\.in$/.test(origin)) return callback(null, true);
+      return callback(new Error(`CORS: Origin ${origin} not allowed`));
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
   })
 );
 
