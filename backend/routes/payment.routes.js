@@ -63,7 +63,7 @@ const utrValidation = [
  * /api/payment/initiate:
  *   post:
  *     summary: Get UPI payment details for a plan (Step 1)
- *     tags: [Payment]
+ *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -93,7 +93,7 @@ router.post('/initiate', initiateValidation, initiatePayment);
  * /api/payment/submit-utr:
  *   post:
  *     summary: Submit UTR number after UPI payment (Step 3)
- *     tags: [Payment]
+ *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -127,7 +127,7 @@ router.post('/submit-utr', utrValidation, submitUtr);
  * /api/payment/history:
  *   get:
  *     summary: Get all payment records for the logged-in user
- *     tags: [Payment]
+ *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -141,7 +141,7 @@ router.get('/history', getPaymentHistory);
  * /api/payment/status:
  *   get:
  *     summary: Get current plan and latest payment status
- *     tags: [Payment]
+ *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
  *     responses:
