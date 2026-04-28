@@ -117,7 +117,7 @@ app.use('/api/monitors', require('./routes/monitor.routes')); // ✅ Feature 3 �
 app.use('/api/logs', require('./routes/log.routes'));          // ✅ Feature 4 — Log History
 app.use('/api/audit', require('./routes/audit.routes'));       // ✅ Feature 6 — PageSpeed Audit
 app.use('/api/payment', require('./routes/payment.routes')); // ✅ Feature 8+9 — Payments
-// app.use('/api/chat', require('./routes/chat.routes'));         // ⏳ Feature 11
+app.use('/api/chat', require('./routes/chat.routes'));         // ✅ Feature 11 — AI Chatbot
 app.use('/api/admin', require('./routes/admin.routes'));       // ✅ Feature 10 — Admin
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
