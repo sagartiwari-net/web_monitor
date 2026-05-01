@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebMonitor — Billing & Plans</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">🌐 WebMonitor<span>Smart Monitoring Platform</span></div>
+    <nav class="sidebar-nav">
+      <div class="nav-item" onclick="window.location.href='dashboard.html'"><span class="icon">📊</span><span>Dashboard</span></div>
+      <div class="nav-item active"><span class="icon">💳</span><span>Billing & Plans</span></div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div id="user-info" style="margin-bottom:10px;font-size:0.82rem;color:var(--text2)"></div>
+      <button class="btn btn-ghost btn-sm w-full" onclick="clearAuth();window.location.href='login.html'">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="section-header">
+      <div>
+        <div class="page-title">Billing & Plans</div>
+        <div class="page-sub">Upgrade your plan to monitor more websites</div>
+      </div>
+    </div>
+
+    <!-- Current Plan Banner -->
+    <div class="card mb-4" id="plan-banner">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('plans')">🚀 Upgrade Plan</button>
+      <button class="tab-btn" onclick="switchTab('history')">📜 Payment History</button>
+    </div>
+
+    <!-- Plans Tab -->
+    <div class="tab-pane active" id="tab-plans">
+      <div class="plans-grid" id="plans-grid">
+        <div class="plan-card" data-plan="basic" onclick="selectPlan('basic', 299)">
+          <div class="plan-name">Basic</div>
+          <div class="plan-price">₹299<span>/mo</span></div>
+          <div class="plan-limit">Up to <strong>3 websites</strong></div>
+          <ul style="margin-top:14px;text-align:left;color:var(--text2);font-size:0.82rem;line-height:2;list-style:none;padding:0">
+            <li>✅ Uptime monitoring (5 min)</li>
+            <li>✅ AI root-cause analysis</li>
+            <li>✅ Email notifications</li>
+            <li>✅ SEO/PageSpeed audits</li>
+            <li>✅ AI chatbot</li>
+          </ul>
+        </div>
+        <div class="plan-card" data-plan="pro" onclick="selectPlan('pro', 599)" style="border-color:var(--purple)">
+          <div style="background:var(--purple);color:#fff;font-size:0.75rem;font-weight:700;padding:3px 10px;border-radius:20px;width:fit-content;margin:0 auto 10px;">POPULAR</div>
+          <div class="plan-name">Pro</div>
+          <div class="plan-price" style="color:var(--purple)">₹599<span>/mo</span></div>
+          <div class="plan-limit">Up to <strong>10 websites</strong></div>
+          <ul style="margin-top:14px;text-align:left;color:var(--text2);font-size:0.82rem;line-height:2;list-style:none;padding:0">
+            <li>✅ Everything in Basic</li>
+            <li>✅ Telegram notifications</li>
+            <li>✅ Priority monitoring</li>
+            <li>✅ Detailed analytics</li>
+          </ul>
+        </div>
+        <div class="plan-card" data-plan="elite" onclick="selectPlan('elite', 1499)" style="border-color:var(--yellow)">
+          <div class="plan-name" style="color:var(--yellow)">Elite</div>
+          <div class="plan-price" style="color:var(--yellow)">₹1499<span>/mo</span></div>
+          <div class="plan-limit">Up to <strong>15 websites</strong></div>
+          <ul style="margin-top:14px;text-align:left;color:var(--text2);font-size:0.82rem;line-height:2;list-style:none;padding:0">
+            <li>✅ Everything in Pro</li>
+            <li>✅ 15 websites</li>
+            <li>✅ Priority support</li>
+            <li>✅ Custom reports</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Payment Flow (shown after plan selection) -->
+      <div id="payment-flow" style="display:none;margin-top:24px">
+        <div class="card">
+          <h2 style="margin-bottom:20px">Complete Your Payment</h2>
+
+          <!-- Step 1: Coupon + Summary -->
+          <div id="step-coupon">
+            <div style="background:var(--bg3);border-radius:8px;padding:16px;margin-bottom:20px" id="price-summary">
+              <!-- filled by JS -->
+            </div>
+            <div class="form-group">
+              <label class="form-label">Coupon Code (optional)</label>
+              <div style="display:flex;gap:8px">
+                <input type="text" id="coupon-input" class="form-input" placeholder="e.g. SAVE20" style="flex:1;text-transform:uppercase">
+                <button class="btn btn-ghost" onclick="applyCoupon()">Apply</button>
+              </div>
+              <div id="coupon-msg" style="margin-top:6px;font-size:0.82rem"></div>
+            </div>
+            <button class="btn btn-primary mt-4" onclick="proceedToUpi()">Proceed to Payment →</button>
+          </div>
+
+          <!-- Step 2: UPI QR -->
+          <div id="step-upi" style="display:none">
+            <div style="display:flex;gap:24px;flex-wrap:wrap">
+              <div style="text-align:center">
+                <canvas id="qr-canvas" style="border-radius:8px;background:#fff;padding:8px"></canvas>
+                <p class="text-muted text-sm mt-4">Scan with any UPI app</p>
+              </div>
+              <div style="flex:1;min-width:220px">
+                <div id="upi-details" style="background:var(--bg3);border-radius:8px;padding:16px;margin-bottom:16px;font-size:0.9rem;line-height:2"></div>
+                <p class="text-muted text-sm">After payment, enter your <strong style="color:var(--text)">UTR number</strong> below:</p>
+                <div class="form-group mt-4">
+                  <label class="form-label">UTR Number</label>
+                  <input type="text" id="utr-input" class="form-input" placeholder="e.g. 406123456789" style="text-transform:uppercase">
+                </div>
+                <div class="error-msg" id="utr-error"></div>
+                <button class="btn btn-success w-full" id="utr-btn" onclick="submitUtr()">✅ Submit Payment</button>
+                <button class="btn btn-ghost w-full mt-4" onclick="document.getElementById('step-upi').style.display='none';document.getElementById('step-coupon').style.display='';">← Back</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Success -->
+          <div id="step-success" style="display:none;text-align:center;padding:32px">
+            <div style="font-size:3rem">🎉</div>
+            <h2 style="margin:12px 0">Payment Submitted!</h2>
+            <p class="text-muted">Admin will verify and activate your plan within 24 hours. You'll receive an email confirmation.</p>
+            <button class="btn btn-primary mt-4" onclick="window.location.href='dashboard.html'">Go to Dashboard</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History Tab -->
+    <div class="tab-pane" id="tab-history">
+      <div class="card">
+        <h3 style="margin-bottom:16px">Payment History</h3>
+        <div id="history-content"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="app.js"></script>
+<script>
+if (!requireAuth()) throw new Error('Not authenticated');
+const user = getUser();
+document.getElementById('user-info').innerHTML = `<div style="font-weight:600;color:var(--text)">${user?.name}</div><div>${user?.email}</div>`;
+
+let selectedPlan = null;
+let finalAmount  = 0;
+let couponCode   = null;
+let upiString    = null;
+
+// ── Load current plan ─────────────────────────────────────
+async function loadPlanStatus() {
+  const { ok, data } = await apiFetch('/api/payment/status');
+  if (!ok) return;
+  const plan = data.data.plan;
+  const latest = data.data.latestPayment;
+
+  const statusMap = { active: '✅ Active', pending: '⏳ Pending Approval', expired: '❌ Expired', free: 'Free' };
+  document.getElementById('plan-banner').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-size:0.85rem;color:var(--text2);margin-bottom:6px">Current Plan</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          ${planBadge(plan.type)}
+          <span style="font-size:0.85rem;color:var(--text2)">${statusMap[plan.status] || plan.status}</span>
+          ${plan.expiresAt ? `<span style="font-size:0.82rem;color:var(--text2)">Expires: ${new Date(plan.expiresAt).toLocaleDateString()}</span>` : ''}
+        </div>
+      </div>
+      ${latest ? `
+      <div style="font-size:0.82rem;color:var(--text2);text-align:right">
+        Last payment: <strong>₹${latest.finalAmount}</strong> (${latest.plan})<br>
+        Status: <span class="badge badge-${latest.status}">${latest.status}</span>
+        ${latest.adminNote ? `<br><em>${latest.adminNote}</em>` : ''}
+      </div>` : ''}
+    </div>`;
+}
+
+// ── Plan selection ────────────────────────────────────────
+function selectPlan(plan, price) {
+  selectedPlan = plan; finalAmount = price; couponCode = null;
+  document.querySelectorAll('.plan-card').forEach(el => el.classList.remove('selected'));
+  document.querySelector(`[data-plan="${plan}"]`).classList.add('selected');
+  document.getElementById('coupon-input').value = '';
+  document.getElementById('coupon-msg').innerHTML = '';
+  document.getElementById('step-coupon').style.display = '';
+  document.getElementById('step-upi').style.display = 'none';
+  document.getElementById('step-success').style.display = 'none';
+  document.getElementById('payment-flow').style.display = '';
+  updatePriceSummary(price, 0, 0, price);
+  document.getElementById('payment-flow').scrollIntoView({ behavior: 'smooth' });
+}
+
+function updatePriceSummary(original, discountPct, discountAmt, final) {
+  document.getElementById('price-summary').innerHTML = `
+    <div style="font-size:0.9rem;line-height:2.2">
+      <div style="display:flex;justify-content:space-between"><span>Plan</span><span><strong>${selectedPlan?.toUpperCase()}</strong></span></div>
+      <div style="display:flex;justify-content:space-between"><span>Original Price</span><span>₹${original}</span></div>
+      ${discountAmt > 0 ? `<div style="display:flex;justify-content:space-between;color:var(--green)"><span>Discount (${discountPct}%)</span><span>-₹${discountAmt}</span></div>` : ''}
+      <hr class="divider" style="margin:8px 0">
+      <div style="display:flex;justify-content:space-between;font-size:1.1rem;font-weight:700"><span>Total</span><span style="color:var(--blue)">₹${final}</span></div>
+    </div>`;
+}
+
+async function applyCoupon() {
+  const code = document.getElementById('coupon-input').value.trim().toUpperCase();
+  if (!code) return;
+  const msgEl = document.getElementById('coupon-msg');
+  msgEl.innerHTML = '⏳ Validating...';
+
+  const { ok, data } = await apiFetch('/api/payment/initiate', {
+    method: 'POST', body: JSON.stringify({ plan: selectedPlan, couponCode: code })
+  });
+
+  if (!ok) {
+    msgEl.innerHTML = `<span style="color:var(--red)">❌ ${data.message || 'Invalid coupon'}</span>`;
+    couponCode = null;
+    updatePriceSummary(finalAmount, 0, 0, finalAmount);
+    return;
+  }
+
+  const p = data.data.pricing;
+  couponCode = code; finalAmount = p.finalAmount;
+  msgEl.innerHTML = `<span style="color:var(--green)">✅ Coupon applied! You save ₹${p.discountAmount} (${p.discountPercent}%)</span>`;
+  updatePriceSummary(p.originalAmount, p.discountPercent, p.discountAmount, p.finalAmount);
+}
+
+async function proceedToUpi() {
+  const { ok, data } = await apiFetch('/api/payment/initiate', {
+    method: 'POST', body: JSON.stringify({ plan: selectedPlan, couponCode: couponCode || undefined })
+  });
+  if (!ok) return toast(data.message || 'Failed to initiate payment', 'error');
+
+  const upi = data.data.upi;
+  upiString = upi.upiString;
+
+  document.getElementById('upi-details').innerHTML = `
+    <div><strong>UPI ID:</strong> ${upi.id}</div>
+    <div><strong>Payee:</strong> ${upi.payeeName}</div>
+    <div><strong>Amount:</strong> <span style="color:var(--green);font-size:1.1rem;font-weight:700">₹${data.data.pricing.finalAmount}</span></div>
+    <div style="font-size:0.78rem;color:var(--text2);margin-top:4px">${upi.qrNote}</div>`;
+
+  // Generate QR
+  QRCode.toCanvas(document.getElementById('qr-canvas'), upiString, {
+    width: 180, margin: 1,
+    color: { dark: '#000000', light: '#ffffff' }
+  });
+
+  document.getElementById('step-coupon').style.display = 'none';
+  document.getElementById('step-upi').style.display = '';
+}
+
+async function submitUtr() {
+  const utr = document.getElementById('utr-input').value.trim().toUpperCase();
+  const errEl = document.getElementById('utr-error');
+  errEl.classList.remove('show');
+
+  if (!utr || utr.length < 6) {
+    errEl.textContent = 'Please enter a valid UTR number (min 6 characters).';
+    errEl.classList.add('show'); return;
+  }
+
+  const btn = document.getElementById('utr-btn');
+  btn.disabled = true; btn.textContent = '⏳ Submitting...';
+
+  const { ok, data } = await apiFetch('/api/payment/submit-utr', {
+    method: 'POST', body: JSON.stringify({
+      plan: selectedPlan,
+      couponCode: couponCode || undefined,
+      utrNumber: utr,
+      paidAmount: finalAmount
+    })
+  });
+
+  btn.disabled = false; btn.textContent = '✅ Submit Payment';
+
+  if (!ok) { errEl.textContent = data.message || 'Submission failed.'; errEl.classList.add('show'); return; }
+
+  document.getElementById('step-upi').style.display = 'none';
+  document.getElementById('step-success').style.display = '';
+}
+
+// ── History Tab ───────────────────────────────────────────
+async function loadHistory() {
+  const { ok, data } = await apiFetch('/api/payment/history');
+  const container = document.getElementById('history-content');
+  if (!ok || !data.data.payments.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No payments yet</p></div>';
+    return;
+  }
+  container.innerHTML = `
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Plan</th><th>Amount</th><th>UTR</th><th>Status</th><th>Note</th></tr></thead>
+      <tbody>${data.data.payments.map(p => `
+        <tr>
+          <td class="text-muted">${new Date(p.createdAt).toLocaleDateString()}</td>
+          <td>${planBadge(p.plan)}</td>
+          <td style="font-weight:600">₹${p.finalAmount}</td>
+          <td style="font-family:monospace;font-size:0.82rem">${p.utrNumber}</td>
+          <td><span class="badge badge-${p.status}">${p.status}</span></td>
+          <td class="text-muted text-sm">${p.adminNote || '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// ── Tabs ──────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'history') loadHistory();
+}
+
+loadPlanStatus();
+</script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebMonitor — Login</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h1>🌐 WebMonitor</h1>
+      <p>Smart Website Monitoring & Intelligence Platform</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Login</button>
+      <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Sign Up</button>
+    </div>
+
+    <!-- Login Form -->
+    <div id="form-login">
+      <div class="error-msg" id="login-error"></div>
+      <div class="success-msg" id="login-success"></div>
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input type="email" id="login-email" class="form-input" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="login-password" class="form-input" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary w-full mt-4" id="login-btn" onclick="doLogin()">
+        Login
+      </button>
+      <p class="text-center text-muted text-sm mt-4">
+        Forgot password? <a href="#" onclick="showForgot()">Reset via OTP</a>
+      </p>
+    </div>
+
+    <!-- Signup Form -->
+    <div id="form-signup" style="display:none">
+      <div class="error-msg" id="signup-error"></div>
+      <div class="success-msg" id="signup-success"></div>
+      <div class="form-group">
+        <label class="form-label">Full Name</label>
+        <input type="text" id="signup-name" class="form-input" placeholder="Sagar Tiwari">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input type="email" id="signup-email" class="form-input" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" id="signup-password" class="form-input" placeholder="Min 8 characters">
+      </div>
+      <button class="btn btn-primary w-full mt-4" id="signup-btn" onclick="doSignup()">
+        Create Account
+      </button>
+    </div>
+
+    <!-- Forgot Password Section -->
+    <div id="form-forgot" style="display:none">
+      <div class="error-msg" id="forgot-error"></div>
+      <div class="success-msg" id="forgot-success"></div>
+      <h3 style="margin-bottom:12px">Reset Password</h3>
+      <div id="forgot-step1">
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" id="forgot-email" class="form-input" placeholder="you@example.com">
+        </div>
+        <button class="btn btn-primary w-full" onclick="sendOtp()">Send OTP</button>
+      </div>
+      <div id="forgot-step2" style="display:none">
+        <div class="form-group">
+          <label class="form-label">OTP (check your email)</label>
+          <input type="text" id="forgot-otp" class="form-input" placeholder="6-digit OTP">
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input type="password" id="forgot-newpass" class="form-input" placeholder="New password">
+        </div>
+        <button class="btn btn-primary w-full" onclick="resetPass()">Reset Password</button>
+      </div>
+      <p class="text-center text-sm mt-4"><a href="#" onclick="switchTab('login')">← Back to Login</a></p>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+// Redirect if already logged in
+if (getToken()) {
+  const user = getUser();
+  window.location.href = user?.role === 'admin' ? 'admin.html' : 'dashboard.html';
+}
+
+function switchTab(tab) {
+  document.getElementById('form-login').style.display   = tab === 'login'  ? '' : 'none';
+  document.getElementById('form-signup').style.display  = tab === 'signup' ? '' : 'none';
+  document.getElementById('form-forgot').style.display  = 'none';
+  document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+  document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+}
+
+function showForgot() {
+  document.getElementById('form-login').style.display  = 'none';
+  document.getElementById('form-forgot').style.display = '';
+}
+
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.classList.add('show');
+  document.getElementById(id.replace('error','success')).classList.remove('show');
+}
+function showOk(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.classList.add('show');
+  document.getElementById(id.replace('success','error')).classList.remove('show');
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) return showErr('login-error', 'Email and password required.');
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Logging in...';
+
+  const { ok, data } = await apiFetch('/api/auth/login', {
+    method: 'POST', body: JSON.stringify({ email, password })
+  });
+
+  btn.disabled = false; btn.textContent = 'Login';
+
+  if (!ok) return showErr('login-error', data.message || 'Login failed.');
+
+  setAuth(data.data.token, data.data.user);
+  showOk('login-success', '✅ Login successful! Redirecting...');
+  setTimeout(() => {
+    window.location.href = data.data.user.role === 'admin' ? 'admin.html' : 'dashboard.html';
+  }, 800);
+}
+
+async function doSignup() {
+  const name     = document.getElementById('signup-name').value.trim();
+  const email    = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  if (!name || !email || !password) return showErr('signup-error', 'All fields required.');
+  if (password.length < 8) return showErr('signup-error', 'Password must be at least 8 characters.');
+
+  const btn = document.getElementById('signup-btn');
+  btn.disabled = true; btn.textContent = 'Creating account...';
+
+  const { ok, data } = await apiFetch('/api/auth/signup', {
+    method: 'POST', body: JSON.stringify({ name, email, password })
+  });
+
+  btn.disabled = false; btn.textContent = 'Create Account';
+
+  if (!ok) return showErr('signup-error', data.message || 'Signup failed.');
+  showOk('signup-success', '✅ Account created! Check your email to verify, then login.');
+  setTimeout(() => switchTab('login'), 2000);
+}
+
+async function sendOtp() {
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) return showErr('forgot-error', 'Enter your email.');
+  const { ok, data } = await apiFetch('/api/auth/forgot-password', {
+    method: 'POST', body: JSON.stringify({ email })
+  });
+  if (!ok) return showErr('forgot-error', data.message || 'Failed to send OTP.');
+  showOk('forgot-success', '✅ OTP sent to your email.');
+  document.getElementById('forgot-step1').style.display = 'none';
+  document.getElementById('forgot-step2').style.display = '';
+}
+
+async function resetPass() {
+  const email    = document.getElementById('forgot-email').value.trim();
+  const otp      = document.getElementById('forgot-otp').value.trim();
+  const password = document.getElementById('forgot-newpass').value;
+  const { ok, data } = await apiFetch('/api/auth/reset-password', {
+    method: 'POST', body: JSON.stringify({ email, otp, newPassword: password })
+  });
+  if (!ok) return showErr('forgot-error', data.message || 'Reset failed.');
+  showOk('forgot-success', '✅ Password reset! Login now.');
+  setTimeout(() => switchTab('login'), 2000);
+}
+
+// Enter key support
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (document.getElementById('form-login').style.display !== 'none') doLogin();
+    if (document.getElementById('form-signup').style.display !== 'none') doSignup();
+  }
+});
+</script>
+</body>
+</html>

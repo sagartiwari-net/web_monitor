@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebMonitor — Admin Panel</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">⚙️ Admin Panel<span>WebMonitor</span></div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" id="nav-pending"  onclick="switchTab('pending')"><span class="icon">⏳</span><span>Pending Payments</span></div>
+      <div class="nav-item" id="nav-payments" onclick="switchTab('payments')"><span class="icon">💰</span><span>All Payments</span></div>
+      <div class="nav-item" id="nav-users"    onclick="switchTab('users')"   ><span class="icon">👥</span><span>Users</span></div>
+      <div class="nav-item" id="nav-coupons"  onclick="switchTab('coupons')" ><span class="icon">🎟</span><span>Coupons</span></div>
+      <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><span class="icon">🔧</span><span>Settings</span></div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div id="user-info" style="margin-bottom:10px;font-size:0.82rem;color:var(--text2)"></div>
+      <button class="btn btn-ghost btn-sm w-full" onclick="clearAuth();window.location.href='login.html'">🚪 Logout</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+
+    <!-- ── Pending Payments ───────────────────────────────── -->
+    <div id="section-pending">
+      <div class="section-header">
+        <div><div class="page-title">Pending Payments</div><div class="page-sub">Review and approve/reject payment submissions</div></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadPending()">🔄 Refresh</button>
+      </div>
+      <div class="card">
+        <div id="pending-content"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ── All Payments ───────────────────────────────────── -->
+    <div id="section-payments" style="display:none">
+      <div class="section-header">
+        <div><div class="page-title">All Payments</div></div>
+        <select class="form-input" id="pay-filter" style="width:160px" onchange="loadAllPayments()">
+          <option value="">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <div class="card">
+        <div id="payments-content"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ── Users ──────────────────────────────────────────── -->
+    <div id="section-users" style="display:none">
+      <div class="section-header">
+        <div><div class="page-title">All Users</div></div>
+        <button class="btn btn-ghost btn-sm" onclick="loadUsers()">🔄 Refresh</button>
+      </div>
+      <div class="card">
+        <div id="users-content"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ── Coupons ────────────────────────────────────────── -->
+    <div id="section-coupons" style="display:none">
+      <div class="section-header">
+        <div><div class="page-title">Coupons</div></div>
+      </div>
+      <div class="card" style="max-width:520px">
+        <h3 style="margin-bottom:20px">Create New Coupon</h3>
+        <div class="error-msg" id="coupon-error"></div>
+        <div class="success-msg" id="coupon-success"></div>
+        <div class="form-group">
+          <label class="form-label">Coupon Code</label>
+          <input type="text" id="c-code" class="form-input" placeholder="e.g. SAVE20" style="text-transform:uppercase">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Discount Type</label>
+            <select id="c-type" class="form-input">
+              <option value="percentage">Percentage (%)</option>
+              <option value="fixed">Fixed (₹)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Discount Value</label>
+            <input type="number" id="c-value" class="form-input" placeholder="e.g. 20">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">Max Uses (0 = unlimited)</label>
+            <input type="number" id="c-maxuses" class="form-input" placeholder="0" value="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valid Until (optional)</label>
+            <input type="date" id="c-expiry" class="form-input">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Applicable Plans (empty = all plans)</label>
+          <div style="display:flex;gap:12px;margin-top:4px">
+            <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:0.85rem"><input type="checkbox" value="basic" class="c-plan"> Basic</label>
+            <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:0.85rem"><input type="checkbox" value="pro" class="c-plan"> Pro</label>
+            <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:0.85rem"><input type="checkbox" value="elite" class="c-plan"> Elite</label>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="createCoupon()">🎟 Create Coupon</button>
+      </div>
+    </div>
+
+    <!-- ── Settings ───────────────────────────────────────── -->
+    <div id="section-settings" style="display:none">
+      <div class="section-header">
+        <div><div class="page-title">Platform Settings</div><div class="page-sub">DB-driven — changes take effect immediately, no restart needed</div></div>
+      </div>
+      <div id="settings-content"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── Approve/Reject Modal ───────────────────────────────── -->
+<div class="modal-overlay" id="action-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Approve Payment</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-payment-info" style="background:var(--bg3);border-radius:8px;padding:14px;margin-bottom:16px;font-size:0.85rem;line-height:2"></div>
+    <div class="form-group">
+      <label class="form-label">Admin Note (optional)</label>
+      <input type="text" id="modal-note" class="form-input" placeholder="e.g. Verified via UPI dashboard">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-success" id="modal-confirm-btn" onclick="confirmAction()">Confirm</button>
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+if (!requireAdmin()) throw new Error('Not admin');
+const user = getUser();
+document.getElementById('user-info').innerHTML = `<div style="font-weight:600;color:var(--text)">${user?.name}</div><div style="font-size:0.75rem">Admin</div>`;
+
+let currentAction = null; // { type: 'approve'|'reject', paymentId }
+
+// ── Tab switching ─────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('[id^="section-"]').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById(`section-${name}`).style.display = '';
+  document.getElementById(`nav-${name}`).classList.add('active');
+  const loaders = { pending: loadPending, payments: loadAllPayments, users: loadUsers, settings: loadSettings };
+  if (loaders[name]) loaders[name]();
+}
+
+// ── Pending Payments ──────────────────────────────────────
+async function loadPending() {
+  document.getElementById('pending-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { ok, data } = await apiFetch('/api/admin/payments/pending');
+  const payments = data?.data?.payments || [];
+
+  if (!ok || !payments.length) {
+    document.getElementById('pending-content').innerHTML = `
+      <div class="empty-state"><div class="icon">✅</div><h3>No pending payments</h3><p>All caught up!</p></div>`;
+    return;
+  }
+
+  document.getElementById('pending-content').innerHTML = `
+    <div class="table-wrap"><table>
+      <thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>UTR</th><th>Coupon</th><th>Date</th><th>Actions</th></tr></thead>
+      <tbody>${payments.map(p => `
+        <tr>
+          <td><div style="font-weight:500">${p.userId?.name || 'Unknown'}</div><div class="text-muted text-xs">${p.userId?.email || ''}</div></td>
+          <td>${planBadge(p.plan)}</td>
+          <td style="font-weight:600">₹${p.finalAmount}</td>
+          <td style="font-family:monospace;font-size:0.82rem">${p.utrNumber}</td>
+          <td class="text-muted">${p.couponCode || '—'}</td>
+          <td class="text-muted">${new Date(p.createdAt).toLocaleDateString()}</td>
+          <td>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-success btn-sm" onclick="openAction('approve','${p._id}',${JSON.stringify(p).replace(/"/g,'&quot;')})">✅ Approve</button>
+              <button class="btn btn-danger btn-sm"  onclick="openAction('reject','${p._id}',${JSON.stringify(p).replace(/"/g,'&quot;')})">❌ Reject</button>
+            </div>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// ── All Payments ──────────────────────────────────────────
+async function loadAllPayments() {
+  document.getElementById('payments-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const status = document.getElementById('pay-filter')?.value || '';
+  const { ok, data } = await apiFetch(`/api/admin/payments${status ? '?status='+status : ''}`);
+  const payments = data?.data?.payments || [];
+
+  if (!ok || !payments.length) {
+    document.getElementById('payments-content').innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>No payments found</p></div>';
+    return;
+  }
+
+  document.getElementById('payments-content').innerHTML = `
+    <div class="table-wrap"><table>
+      <thead><tr><th>User</th><th>Plan</th><th>Amount</th><th>UTR</th><th>Status</th><th>Note</th><th>Date</th></tr></thead>
+      <tbody>${payments.map(p => `
+        <tr>
+          <td><div>${p.userId?.name||'?'}</div><div class="text-muted text-xs">${p.userId?.email||''}</div></td>
+          <td>${planBadge(p.plan)}</td>
+          <td style="font-weight:600">₹${p.finalAmount}</td>
+          <td style="font-family:monospace;font-size:0.82rem">${p.utrNumber}</td>
+          <td><span class="badge badge-${p.status}">${p.status}</span></td>
+          <td class="text-muted text-sm">${p.adminNote||'—'}</td>
+          <td class="text-muted">${new Date(p.createdAt).toLocaleDateString()}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// ── Users ─────────────────────────────────────────────────
+async function loadUsers() {
+  document.getElementById('users-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { ok, data } = await apiFetch('/api/admin/users');
+  const users = data?.data?.users || [];
+  if (!ok || !users.length) {
+    document.getElementById('users-content').innerHTML = '<div class="empty-state"><p>No users found</p></div>';
+    return;
+  }
+  document.getElementById('users-content').innerHTML = `
+    <div class="table-wrap"><table>
+      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Plan</th><th>Plan Status</th><th>Verified</th><th>Joined</th></tr></thead>
+      <tbody>${users.map(u => `
+        <tr>
+          <td style="font-weight:500">${u.name}</td>
+          <td class="text-muted">${u.email}</td>
+          <td><span class="badge ${u.role==='admin'?'badge-elite':'badge-free'}">${u.role}</span></td>
+          <td>${planBadge(u.plan?.type)}</td>
+          <td><span class="badge badge-${u.plan?.status==='active'?'approved':u.plan?.status==='pending'?'pending':'rejected'}">${u.plan?.status||'—'}</span></td>
+          <td>${u.isEmailVerified?'✅':'❌'}</td>
+          <td class="text-muted">${new Date(u.createdAt).toLocaleDateString()}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// ── Approve / Reject Modal ────────────────────────────────
+function openAction(type, paymentId, payment) {
+  currentAction = { type, paymentId };
+  document.getElementById('modal-title').textContent = type === 'approve' ? '✅ Approve Payment' : '❌ Reject Payment';
+  document.getElementById('modal-payment-info').innerHTML = `
+    <div><strong>User:</strong> ${payment.userId?.name || 'Unknown'} (${payment.userId?.email || ''})</div>
+    <div><strong>Plan:</strong> ${payment.plan?.toUpperCase()} — ₹${payment.finalAmount}</div>
+    <div><strong>UTR:</strong> ${payment.utrNumber}</div>`;
+  const btn = document.getElementById('modal-confirm-btn');
+  btn.textContent = type === 'approve' ? '✅ Approve' : '❌ Reject';
+  btn.className   = `btn ${type === 'approve' ? 'btn-success' : 'btn-danger'}`;
+  document.getElementById('modal-note').value = '';
+  document.getElementById('action-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('action-modal').classList.remove('open'); currentAction = null; }
+
+async function confirmAction() {
+  if (!currentAction) return;
+  const { type, paymentId } = currentAction;
+  const note = document.getElementById('modal-note').value.trim();
+  const btn = document.getElementById('modal-confirm-btn');
+  btn.disabled = true; btn.textContent = 'Processing...';
+
+  const { ok, data } = await apiFetch(`/api/admin/payments/${paymentId}/${type}`, {
+    method: 'POST', body: JSON.stringify({ adminNote: note })
+  });
+
+  btn.disabled = false;
+  if (!ok) { toast(data.message || 'Action failed', 'error'); return; }
+  toast(`Payment ${type}d successfully! ✅`, 'success');
+  closeModal();
+  loadPending();
+}
+
+// ── Create Coupon ─────────────────────────────────────────
+async function createCoupon() {
+  const code  = document.getElementById('c-code').value.trim().toUpperCase();
+  const type  = document.getElementById('c-type').value;
+  const value = parseFloat(document.getElementById('c-value').value);
+  const maxUses = parseInt(document.getElementById('c-maxuses').value) || 0;
+  const expiry  = document.getElementById('c-expiry').value;
+  const plans   = [...document.querySelectorAll('.c-plan:checked')].map(el => el.value);
+
+  const errEl = document.getElementById('coupon-error');
+  const okEl  = document.getElementById('coupon-success');
+  errEl.classList.remove('show'); okEl.classList.remove('show');
+
+  if (!code || !value) { errEl.textContent = 'Code and value required.'; errEl.classList.add('show'); return; }
+
+  const body = { code, discountType: type, discountValue: value, maxUses };
+  if (expiry) body.validUntil = expiry;
+  if (plans.length) body.applicablePlans = plans;
+
+  const { ok, data } = await apiFetch('/api/admin/coupons', { method: 'POST', body: JSON.stringify(body) });
+  if (!ok) { errEl.textContent = data.message || 'Failed to create coupon.'; errEl.classList.add('show'); return; }
+  okEl.textContent = `✅ Coupon "${code}" created successfully!`; okEl.classList.add('show');
+  document.getElementById('c-code').value = ''; document.getElementById('c-value').value = '';
+}
+
+// ── Settings ──────────────────────────────────────────────
+async function loadSettings() {
+  document.getElementById('settings-content').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const { ok, data } = await apiFetch('/api/admin/settings');
+  if (!ok) { document.getElementById('settings-content').innerHTML = '<p class="text-muted">Failed to load settings.</p>'; return; }
+  const s = data.data.settings;
+
+  document.getElementById('settings-content').innerHTML = `
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:20px">
+
+    <div class="card">
+      <h3 style="margin-bottom:16px">🤖 AI — Gemini</h3>
+      <div class="form-group"><label class="form-label">Gemini API Key</label>
+        <input type="password" id="s-geminiApiKey" class="form-input" placeholder="${s.geminiApiKey||'Not set'}">
+      </div>
+      <div class="form-group"><label class="form-label">Model</label>
+        <input type="text" id="s-geminiModel" class="form-input" value="${s.geminiModel||'gemini-2.5-flash'}">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings(['geminiApiKey','geminiModel'])">Save AI Settings</button>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:16px">📊 PageSpeed API</h3>
+      <div class="form-group"><label class="form-label">PageSpeed API Key</label>
+        <input type="password" id="s-pagespeedApiKey" class="form-input" placeholder="${s.pagespeedApiKey||'Not set'}">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings(['pagespeedApiKey'])">Save PageSpeed Key</button>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:16px">💳 UPI Payment</h3>
+      <div class="form-group"><label class="form-label">UPI ID</label>
+        <input type="text" id="s-upiId" class="form-input" value="${s.upiId||''}">
+      </div>
+      <div class="form-group"><label class="form-label">Payee Name</label>
+        <input type="text" id="s-upiPayeeName" class="form-input" value="${s.upiPayeeName||''}">
+      </div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:0.85rem;cursor:pointer;margin-bottom:12px">
+        <input type="checkbox" id="s-upiEnabled" ${s.upiEnabled?'checked':''}>UPI Enabled
+      </label>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings(['upiId','upiPayeeName','upiEnabled'])">Save UPI Settings</button>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:16px">💰 Plan Pricing (₹)</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div class="form-group"><label class="form-label">Basic</label><input type="number" id="s-pricing-basic" class="form-input" value="${s.pricing?.basic||299}"></div>
+        <div class="form-group"><label class="form-label">Pro</label><input type="number" id="s-pricing-pro" class="form-input" value="${s.pricing?.pro||599}"></div>
+        <div class="form-group"><label class="form-label">Elite</label><input type="number" id="s-pricing-elite" class="form-input" value="${s.pricing?.elite||1499}"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="savePricing()">Save Pricing</button>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:16px">📧 Email / SMTP</h3>
+      <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" id="s-smtpHost" class="form-input" value="${s.smtpHost||''}"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group"><label class="form-label">Port</label><input type="number" id="s-smtpPort" class="form-input" value="${s.smtpPort||587}"></div>
+        <div class="form-group"><label class="form-label">Username</label><input type="text" id="s-smtpUser" class="form-input" value="${s.smtpUser||''}"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Password (App Password)</label><input type="password" id="s-smtpPass" class="form-input" placeholder="Leave blank to keep existing"></div>
+      <div class="form-group"><label class="form-label">From Email</label><input type="email" id="s-fromEmail" class="form-input" value="${s.fromEmail||''}"></div>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings(['smtpHost','smtpPort','smtpUser','smtpPass','fromEmail'])">Save SMTP Settings</button>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:16px">🌐 App Identity</h3>
+      <div class="form-group"><label class="form-label">App Name</label><input type="text" id="s-appName" class="form-input" value="${s.appName||'WebMonitor'}"></div>
+      <div class="form-group"><label class="form-label">Frontend URL</label><input type="text" id="s-frontendUrl" class="form-input" value="${s.frontendUrl||''}"></div>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings(['appName','frontendUrl'])">Save App Settings</button>
+    </div>
+  </div>`;
+}
+
+async function saveSettings(fields) {
+  const updates = {};
+  fields.forEach(f => {
+    const el = document.getElementById(`s-${f}`);
+    if (!el) return;
+    if (el.type === 'checkbox') { updates[f] = el.checked; }
+    else if (el.type === 'number') { if (el.value) updates[f] = Number(el.value); }
+    else { if (el.value.trim()) updates[f] = el.value.trim(); }
+  });
+  const { ok, data } = await apiFetch('/api/admin/settings', { method: 'PUT', body: JSON.stringify(updates) });
+  toast(ok ? '✅ Settings saved!' : (data.message || 'Failed'), ok ? 'success' : 'error');
+}
+
+async function savePricing() {
+  const updates = { pricing: {
+    basic: Number(document.getElementById('s-pricing-basic').value),
+    pro:   Number(document.getElementById('s-pricing-pro').value),
+    elite: Number(document.getElementById('s-pricing-elite').value),
+  }};
+  const { ok, data } = await apiFetch('/api/admin/settings', { method: 'PUT', body: JSON.stringify(updates) });
+  toast(ok ? '✅ Pricing updated!' : (data.message || 'Failed'), ok ? 'success' : 'error');
+}
+
+// Modal close on overlay click
+document.getElementById('action-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Init — load pending payments
+loadPending();
+</script>
+</body>
+</html>
