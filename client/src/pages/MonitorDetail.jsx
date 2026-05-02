@@ -68,8 +68,10 @@ const MonitorDetail = () => {
 
   if (!monitor) return null;
 
-  const isDown    = monitor.currentStatus === 'DOWN';
-  const isUp      = monitor.currentStatus === 'UP';
+  const currentStatus = monitor.status?.toUpperCase() || monitor.currentStatus || 'UNKNOWN';
+  const isDown = currentStatus === 'DOWN';
+  const isUp   = currentStatus === 'UP';
+  const lastResponseTime = logsData.length > 0 ? logsData[0].responseTime : monitor.lastResponseTime;
 
   /* Score Ring Component */
   const ScoreRing = ({ score, label }) => {
@@ -125,7 +127,7 @@ const MonitorDetail = () => {
             </h1>
             <span className={`badge ${isDown ? 'badge-down' : isUp ? 'badge-up' : 'badge-unknown'}`}>
               {isDown && <span className="status-dot status-dot-down mr-1" />}
-              {monitor.currentStatus || 'UNKNOWN'}
+              {currentStatus}
             </span>
           </div>
           <a
@@ -151,8 +153,8 @@ const MonitorDetail = () => {
               : <CheckCircle size={18} className="text-emerald-500" />
             }
           </div>
-          <div className={`stat-card-value text-2xl ${isDown ? 'text-red-500' : 'text-emerald-500'}`}>
-            {monitor.currentStatus || 'UNKNOWN'}
+          <div className={`stat-card-value text-2xl ${isDown ? 'text-red-500' : isUp ? 'text-emerald-500' : 'text-slate-500'}`}>
+            {currentStatus}
           </div>
           <div className="stat-card-label mt-1">Current Status</div>
         </div>
@@ -162,8 +164,8 @@ const MonitorDetail = () => {
             <Zap size={18} className="text-indigo-600" />
           </div>
           <div className="stat-card-value text-2xl">
-            {monitor.lastResponseTime ? `${monitor.lastResponseTime}` : '—'}
-            {monitor.lastResponseTime && <span className="text-sm font-normal text-slate-400 ml-1">ms</span>}
+            {lastResponseTime ? `${lastResponseTime}` : '—'}
+            {lastResponseTime && <span className="text-sm font-normal text-slate-400 ml-1">ms</span>}
           </div>
           <div className="stat-card-label mt-1">Response Time</div>
         </div>
@@ -173,8 +175,8 @@ const MonitorDetail = () => {
             <Clock size={18} className="text-slate-500" />
           </div>
           <div className="stat-card-value text-lg font-bold">
-            {monitor.lastCheckedAt
-              ? formatDistanceToNow(new Date(monitor.lastCheckedAt)) + ' ago'
+            {(monitor.lastChecked || monitor.lastCheckedAt)
+              ? formatDistanceToNow(new Date(monitor.lastChecked || monitor.lastCheckedAt)) + ' ago'
               : 'Never'
             }
           </div>
@@ -225,16 +227,16 @@ const MonitorDetail = () => {
                 <div
                   key={index}
                   className={`flex-1 rounded-sm cursor-pointer transition-all hover:scale-y-110 ${
-                    log.status === 'UP' ? 'bg-emerald-400' : 'bg-red-400'
+                    log.status === 'up' || log.status === 'UP' ? 'bg-emerald-400' : 'bg-red-400'
                   }`}
-                  title={`${format(new Date(log.checkedAt), 'dd MMM, HH:mm')} — ${log.status}${log.error ? ` (${log.error})` : ` — ${log.responseTime}ms`}`}
+                  title={`${format(new Date(log.createdAt || log.checkedAt), 'dd MMM, HH:mm')} — ${log.status?.toUpperCase()}${log.error ? ` (${log.error})` : ` — ${log.responseTime}ms`}`}
                 />
               ))}
             </div>
             <div className="flex justify-between text-xs text-slate-400 font-medium mt-2 px-1">
               <span>
                 {logsData.length > 0
-                  ? formatDistanceToNow(new Date(logsData[logsData.length - 1].checkedAt)) + ' ago'
+                  ? formatDistanceToNow(new Date(logsData[logsData.length - 1].createdAt || logsData[logsData.length - 1].checkedAt)) + ' ago'
                   : 'Oldest'}
               </span>
               <span>Now</span>
