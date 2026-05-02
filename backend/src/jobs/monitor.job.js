@@ -21,32 +21,37 @@ export const startMonitoring = () => {
       let errorMessage = "";
 
       try {
-        const response = await axios.get(monitor.url, { timeout: 10000 });
-        responseTime = Date.now() - startTime;
-        statusCode = response.status;
-      } catch (error) {
-        status = "down";
-        statusCode = error.response ? error.response.status : 500;
-        errorMessage = error.message;
-        responseTime = Date.now() - startTime;
+        try {
+          const response = await axios.get(monitor.url, { timeout: 10000 });
+          responseTime = Date.now() - startTime;
+          statusCode = response.status;
+        } catch (error) {
+          status = "down";
+          statusCode = error.response ? error.response.status : 500;
+          errorMessage = error.message;
+          responseTime = Date.now() - startTime;
+        }
+
+        if (monitor.status !== status && monitor.status !== "pending") {
+          await handleStatusChange(monitor, status, errorMessage);
+        }
+
+        await Monitor.updateOne(
+          { _id: monitor._id },
+          { $set: { status, lastChecked: new Date() } },
+          { runValidators: false }
+        );
+
+        await Log.create({
+          monitor: monitor._id,
+          status,
+          responseTime,
+          statusCode,
+          message: errorMessage || "OK",
+        });
+      } catch (jobError) {
+        console.error(`Error processing monitor ${monitor._id}:`, jobError.message);
       }
-
-       if (monitor.status !== status && monitor.status !== "pending") {
-        await handleStatusChange(monitor, status, errorMessage);
-      }
-
-    
-      monitor.status = status;
-      monitor.lastChecked = new Date();
-      await monitor.save();
-
-      await Log.create({
-        monitor: monitor._id,
-        status,
-        responseTime,
-        statusCode,
-        message: errorMessage || "OK",
-      });
     }
   });
 
