@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const res = await apiClient.post('/auth/login', { email, password });
     if (res.success) {
-      const { token: newToken, user: userData } = res.data;
+      const { token: newToken, user: userData } = res;
       setToken(newToken);
       setUser(userData);
       localStorage.setItem('wm_token', newToken);
