@@ -248,11 +248,13 @@ export const updateProfile = async (req, res) => {
     const { notificationPreferences, telegramId } = req.body;
     const user = await User.findById(req.user.id);
     
-    if (notificationPreferences) user.notificationPreferences = notificationPreferences;
-    if (telegramId !== undefined) user.telegramId = telegramId;
+    const updateData = {};
+    if (notificationPreferences) updateData.notificationPreferences = notificationPreferences;
+    if (telegramId !== undefined) updateData.telegramId = telegramId;
     
-    await user.save();
-    res.status(200).json({ success: true, user });
+    await User.updateOne({ _id: user._id }, { $set: updateData }, { runValidators: false });
+    const updatedUser = await User.findById(req.user.id);
+    res.status(200).json({ success: true, user: updatedUser });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
