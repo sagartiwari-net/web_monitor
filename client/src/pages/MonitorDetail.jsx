@@ -49,9 +49,13 @@ const MonitorDetail = () => {
     setAuditLoading(true);
     try {
       const res = await apiClient.post(`/audit/${id}`);
-      setAuditData(res.data.audit);
+      // API returns { success, data: { audit } }
+      const auditResult = res?.data?.audit || res?.audit || null;
+      setAuditData(auditResult);
+      if (!auditResult) alert('Audit completed but no data returned.');
     } catch (err) {
-      alert(err.message || 'Audit failed');
+      const msg = err?.response?.data?.message || err.message || 'Audit failed';
+      alert(`Audit failed: ${msg}`);
     } finally {
       setAuditLoading(false);
     }
@@ -70,7 +74,7 @@ const MonitorDetail = () => {
 
   const currentStatus = monitor.status?.toUpperCase() || monitor.currentStatus || 'UNKNOWN';
   const isDown = currentStatus === 'DOWN';
-  const isUp   = currentStatus === 'UP';
+  const isUp = currentStatus === 'UP';
   const lastResponseTime = logsData.length > 0 ? logsData[0].responseTime : monitor.lastResponseTime;
 
   /* Score Ring Component */
@@ -85,17 +89,17 @@ const MonitorDetail = () => {
     return (
       <div className="flex flex-col items-center gap-2">
         <svg width={size} height={size}>
-          <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={strokeW} />
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={strokeW} />
           <circle
-            cx={size/2} cy={size/2} r={r}
+            cx={size / 2} cy={size / 2} r={r}
             fill="none" stroke={color} strokeWidth={strokeW}
             strokeDasharray={circ}
             strokeDashoffset={offset}
             strokeLinecap="round"
-            transform={`rotate(-90 ${size/2} ${size/2})`}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
             style={{ transition: 'stroke-dashoffset 1s ease' }}
           />
-          <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="central"
+          <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
             fontSize="20" fontWeight="800" fill={color}
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {score}
@@ -226,9 +230,8 @@ const MonitorDetail = () => {
               {[...logsData].reverse().map((log, index) => (
                 <div
                   key={index}
-                  className={`flex-1 rounded-sm cursor-pointer transition-all hover:scale-y-110 ${
-                    log.status === 'up' || log.status === 'UP' ? 'bg-emerald-400' : 'bg-red-400'
-                  }`}
+                  className={`flex-1 rounded-sm cursor-pointer transition-all hover:scale-y-110 ${log.status === 'up' || log.status === 'UP' ? 'bg-emerald-400' : 'bg-red-400'
+                    }`}
                   title={`${format(new Date(log.createdAt || log.checkedAt), 'dd MMM, HH:mm')} — ${log.status?.toUpperCase()}${log.error ? ` (${log.error})` : ` — ${log.responseTime}ms`}`}
                 />
               ))}
@@ -330,10 +333,10 @@ const MonitorDetail = () => {
             {/* Score Rings */}
             <div className="flex flex-wrap gap-8 justify-center mb-8 py-4">
               {[
-                { key: 'perfScore',          label: 'Performance'    },
-                { key: 'accessScore',        label: 'Accessibility'  },
+                { key: 'perfScore', label: 'Performance' },
+                { key: 'accessScore', label: 'Accessibility' },
                 { key: 'bestPracticesScore', label: 'Best Practices' },
-                { key: 'seoScore',           label: 'SEO'            },
+                { key: 'seoScore', label: 'SEO' },
               ].map(({ key, label }) => (
                 <ScoreRing key={key} score={auditData[key] || 0} label={label} />
               ))}

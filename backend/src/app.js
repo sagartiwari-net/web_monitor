@@ -12,6 +12,7 @@ import seoRoutes from "./router/seo.routes.js";
 import { protect } from "./middlewares/auth.middleware.js";
 import Log from "./models/log.model.js";
 import Monitor from "./models/monitor.model.js";
+import { getAudit, runAudit } from "./controllers/audit.controller.js";
 
 const app = express();
 
@@ -41,13 +42,9 @@ app.get("/api/logs/:monitorId", protect, async (req, res) => {
   }
 });
 
-// Inline audit stub route (returns empty if no audit service)
-app.get("/api/audit/:monitorId", protect, async (req, res) => {
-  res.status(200).json({ success: true, data: { audit: null } });
-});
-app.post("/api/audit/:monitorId", protect, async (req, res) => {
-  res.status(200).json({ success: false, message: "Audit service not configured" });
-});
+// Real audit routes using Google PageSpeed Insights
+app.get("/api/audit/:monitorId", protect, getAudit);
+app.post("/api/audit/:monitorId", protect, runAudit);
 
 app.get("/", (req, res) => {
   res.send("Web Monitor SaaS API is running...");
