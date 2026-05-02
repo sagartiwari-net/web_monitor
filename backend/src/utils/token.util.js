@@ -23,6 +23,10 @@ export const sendTokenResponse = (user, statusCode, res, message) => {
     email: user.email,
     isVerified: user.isVerified,
     provider: user.provider,
+    role: user.role,
+    plan: user.plan,
+    notifications: user.notifications,
+    telegramId: user.telegramId,
   };
 
   res

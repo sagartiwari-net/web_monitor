@@ -99,8 +99,8 @@ const Login = () => {
       const res = await apiClient.post('/auth/login-otp/verify', { email: form.email, otp: loginOtp });
       
       // Manually set token and user in context/localStorage
-      localStorage.setItem('wm_token', res.data.token);
-      localStorage.setItem('wm_user', JSON.stringify(res.data.user));
+      localStorage.setItem('wm_token', res.token);
+      localStorage.setItem('wm_user', JSON.stringify(res.user));
       // Reload page to re-initialize auth state correctly
       window.location.href = '/dashboard';
     } catch (err) {
