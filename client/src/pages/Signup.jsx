@@ -75,6 +75,7 @@ const Signup = () => {
         fullname: form.fullname,
         email: form.email,
         password: form.password,
+        confirmPassword: form.confirmPassword,
       });
       setShowOTP(true);
     } catch (err) {
