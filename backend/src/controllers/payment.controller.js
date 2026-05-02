@@ -1,6 +1,5 @@
 import Payment from "../models/payment.model.js";
 import User from "../models/user.model.js";
-
 import Coupon from "../models/coupon.model.js";
 
 const PLAN_PRICES = {
@@ -40,27 +39,31 @@ export const initiatePayment = async (req, res) => {
 
     if (couponCode) {
       const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
-      if (!coupon || coupon.expiryDate < new Date()) {
+      if (!coupon || (coupon.expiryDate && coupon.expiryDate < new Date())) {
         return res.status(400).json({ message: "Invalid or expired coupon" });
       }
       
+      const discountVal = coupon.discountAmount || coupon.discountValue || 0;
       if (coupon.discountType === "percentage") {
-        discountAmount = Math.round((originalAmount * coupon.discountAmount) / 100);
+        discountAmount = Math.round((originalAmount * discountVal) / 100);
       } else {
-        discountAmount = coupon.discountAmount;
+        discountAmount = discountVal;
       }
       
       finalAmount = Math.max(0, originalAmount - discountAmount);
     }
+
+    const upiId = process.env.UPI_ID || "test@upi";
+    const upiPayeeName = process.env.UPI_PAYEE_NAME || "Web Monitor";
 
     res.status(200).json({
       success: true,
       data: {
         pricing: { originalAmount, discountAmount, finalAmount },
         upi: {
-          id: process.env.UPI_ID || "test@upi",
-          payeeName: process.env.UPI_PAYEE_NAME || "Web Monitor",
-          upiString: `upi://pay?pa=${process.env.UPI_ID || "test@upi"}&pn=${process.env.UPI_PAYEE_NAME || "Web Monitor"}&am=${finalAmount}&cu=INR`
+          id: upiId,
+          payeeName: upiPayeeName,
+          upiString: `upi://pay?pa=${upiId}&pn=${encodeURIComponent(upiPayeeName)}&am=${finalAmount}&cu=INR`
         }
       }
     });
@@ -73,6 +76,10 @@ export const submitUtr = async (req, res) => {
   try {
     const { plan, utrNumber, paidAmount } = req.body;
     
+    if (!utrNumber) {
+      return res.status(400).json({ message: "UTR number is required" });
+    }
+
     const existingPayment = await Payment.findOne({ utr: utrNumber });
     if (existingPayment) {
       return res.status(400).json({ message: "UTR already submitted" });

@@ -17,7 +17,7 @@ const Dashboard = () => {
   const [plan, setPlan] = useState('free');
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newMonitor, setNewMonitor] = useState({ name: '', url: '', type: 'HTTP', port: '', keyword: '' });
+  const [newMonitor, setNewMonitor] = useState({ name: '', url: '', type: 'https', port: '', keyword: '' });
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState('');
 
@@ -27,15 +27,15 @@ const Dashboard = () => {
         apiClient.get('/monitors'),
         apiClient.get('/payment/status').catch(() => null),
       ]);
-      const monData = monRes.data.monitors || [];
+      const monData = monRes.data || monRes.monitors || [];
       setMonitors(monData);
       setStats({
         total:   monData.length,
-        up:      monData.filter((m) => m.currentStatus === 'UP').length,
-        down:    monData.filter((m) => m.currentStatus === 'DOWN').length,
-        unknown: monData.filter((m) => !m.currentStatus || m.currentStatus === 'UNKNOWN').length,
+        up:      monData.filter((m) => m.status === 'up').length,
+        down:    monData.filter((m) => m.status === 'down').length,
+        unknown: monData.filter((m) => !m.status || m.status === 'pending').length,
       });
-      if (planRes?.success) setPlan(planRes.data.plan?.type || 'free');
+      if (planRes?.success) setPlan(planRes.data?.plan?.type || planRes.data?.plan || 'free');
     } catch (err) {
       console.error(err);
     } finally {
@@ -55,12 +55,12 @@ const Dashboard = () => {
     setModalLoading(true);
     try {
       const payload = { name: newMonitor.name, url: newMonitor.url, type: newMonitor.type };
-      if (newMonitor.type === 'PORT' && newMonitor.port) payload.port = parseInt(newMonitor.port);
-      if (newMonitor.type === 'KEYWORD' && newMonitor.keyword) payload.keyword = newMonitor.keyword;
+      if (newMonitor.type === 'port' && newMonitor.port) payload.port = parseInt(newMonitor.port);
+      if (newMonitor.type === 'keyword' && newMonitor.keyword) payload.keyword = newMonitor.keyword;
       const res = await apiClient.post('/monitors', payload);
       setIsModalOpen(false);
-      setNewMonitor({ name: '', url: '', type: 'HTTP', port: '', keyword: '' });
-      if (res.data.monitor?._id) navigate(`/monitor/${res.data.monitor._id}`);
+      setNewMonitor({ name: '', url: '', type: 'https', port: '', keyword: '' });
+      if (res.data?.monitor?._id || res.monitor?._id) navigate(`/monitor/${res.data?.monitor?._id || res.monitor?._id}`);
       else fetchMonitors();
     } catch (err) {
       setModalError(err.message || 'Failed to add monitor');
@@ -314,9 +314,8 @@ const Dashboard = () => {
                     value={newMonitor.type}
                     onChange={(e) => setNewMonitor({ ...newMonitor, type: e.target.value })}
                   >
-                    <option value="HTTP">🌐 HTTP(s) — Website / API</option>
-                    <option value="KEYWORD">🔍 Keyword — Find text on page</option>
-                    <option value="PORT">🔌 Port — TCP connection check</option>
+                    <option value="https">🌐 HTTP(s) — Website / API</option>
+                    <option value="ping">🔍 Ping — Check host reachability</option>
                   </select>
                 </div>
 

@@ -13,9 +13,10 @@ export const createMonitor = async (req, res) => {
     const { name, url, type, interval } = req.body;
     const user = req.user;
 
+    const userPlan = typeof user.plan === 'object' ? (user.plan?.type || 'free') : (user.plan || 'free');
     const count = await Monitor.countDocuments({ user: user._id });
-    if (count >= PLAN_LIMITS[user.plan]) {
-      return res.status(400).json({ message: `Plan limit reached for ${user.plan} plan.` });
+    if (count >= PLAN_LIMITS[userPlan]) {
+      return res.status(400).json({ message: `Plan limit reached for ${userPlan} plan.` });
     }
 
     const monitor = await Monitor.create({
@@ -26,7 +27,7 @@ export const createMonitor = async (req, res) => {
       interval,
     });
 
-    res.status(201).json({ success: true, data: monitor });
+    res.status(201).json({ success: true, data: { monitor } });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

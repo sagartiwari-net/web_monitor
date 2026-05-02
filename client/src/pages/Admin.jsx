@@ -106,19 +106,22 @@ const Admin = () => {
     try {
       if (activeTab === 'pending') {
         const res = await apiClient.get('/admin/payments/pending');
-        setData(res.data.payments);
+        setData(res.data || []);
       } else if (activeTab === 'payments') {
         const res = await apiClient.get('/admin/payments');
-        setData(res.data.payments);
+        setData(res.data || []);
       } else if (activeTab === 'users') {
         const res = await apiClient.get('/admin/users');
-        setData(res.data.users);
+        setData(res.data || []);
       } else if (activeTab === 'settings') {
         const res = await apiClient.get('/admin/settings');
-        setSettings(res.data.settings);
+        // settings comes back as an array from DB; convert to single object for easy access
+        const settingsArr = res.data || [];
+        const settingsObj = settingsArr.length > 0 ? settingsArr[0] : {};
+        setSettings(settingsObj);
       } else if (activeTab === 'coupons') {
         const res = await apiClient.get('/admin/coupons');
-        setData(res.data.coupons);
+        setData(res.data || []);
       } else if (activeTab === 'email-templates') {
         const res = await apiClient.get('/admin/email-templates');
         setEmailTemplatesData(res.data); // It returns { total, grouped: { auth, billing, monitoring } }
@@ -319,12 +322,12 @@ const Admin = () => {
                 {data?.map(p => (
                   <tr key={p._id}>
                     <td>
-                      <div className="font-medium">{p.userId?.name}</div>
-                      <div className="text-xs text-slate-400">{p.userId?.email}</div>
+                      <div className="font-medium">{p.user?.name || p.userId?.name || 'N/A'}</div>
+                      <div className="text-xs text-slate-400">{p.user?.email || p.userId?.email}</div>
                     </td>
-                    <td><span className={`badge badge-${p.plan}`}>{p.plan.toUpperCase()}</span></td>
-                    <td className="font-bold">₹{p.finalAmount}</td>
-                    <td className="font-mono text-sm">{p.utrNumber}</td>
+                    <td><span className={`badge badge-${p.plan}`}>{p.plan?.toUpperCase()}</span></td>
+                    <td className="font-bold">₹{p.finalAmount || p.amount}</td>
+                    <td className="font-mono text-sm">{p.utrNumber || p.utr}</td>
                     <td className="text-sm text-slate-400">{new Date(p.createdAt).toLocaleDateString()}</td>
                     <td>
                       <div className="flex gap-2">
@@ -389,13 +392,13 @@ const Admin = () => {
                 {filteredData?.map(p => (
                   <tr key={p._id}>
                     <td>
-                      <div className="font-medium">{p.userId?.name}</div>
-                      <div className="text-xs text-slate-400">{p.userId?.email}</div>
+                      <div className="font-medium">{p.user?.name || p.userId?.name || 'N/A'}</div>
+                      <div className="text-xs text-slate-400">{p.user?.email || p.userId?.email}</div>
                     </td>
-                    <td><span className={`badge badge-${p.plan}`}>{p.plan.toUpperCase()}</span></td>
-                    <td className="font-bold">₹{p.finalAmount}</td>
-                    <td className="font-mono text-sm">{p.utrNumber}</td>
-                    <td><span className={`badge badge-${p.status === 'active' ? 'approved' : p.status}`}>{p.status.toUpperCase()}</span></td>
+                    <td><span className={`badge badge-${p.plan}`}>{p.plan?.toUpperCase()}</span></td>
+                    <td className="font-bold">₹{p.finalAmount || p.amount}</td>
+                    <td className="font-mono text-sm">{p.utrNumber || p.utr}</td>
+                    <td><span className={`badge badge-${p.status === 'active' ? 'approved' : p.status}`}>{p.status?.toUpperCase()}</span></td>
                     <td className="text-sm text-slate-400">{new Date(p.createdAt).toLocaleDateString()}</td>
                     <td>
                       {p.status === 'pending' && (

@@ -70,7 +70,7 @@ export const getEmailTemplates = async (req, res) => {
 
 export const getPayments = async (req, res) => {
   try {
-    const payments = await Payment.find().populate("user", "fullname email").sort("-createdAt");
+    const payments = await Payment.find().populate("user", "name fullname email").sort("-createdAt");
     res.status(200).json({ success: true, data: payments });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -79,7 +79,7 @@ export const getPayments = async (req, res) => {
 
 export const getPendingPayments = async (req, res) => {
   try {
-    const payments = await Payment.find({ status: "pending" }).populate("user", "fullname email").sort("-createdAt");
+    const payments = await Payment.find({ status: "pending" }).populate("user", "name fullname email").sort("-createdAt");
     res.status(200).json({ success: true, data: payments });
   } catch (error) {
     res.status(500).json({ message: error.message });
