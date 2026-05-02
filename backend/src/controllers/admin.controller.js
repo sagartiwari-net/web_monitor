@@ -88,9 +88,18 @@ export const deleteUser = async (req, res) => {
 
 export const updateSettings = async (req, res) => {
   try {
-    const { key, value } = req.body;
-    await Settings.findOneAndUpdate({ key }, { value }, { upsert: true });
-    res.status(200).json({ success: true, message: "Settings updated" });
+    // The UI sends a flat object with the fields to update
+    // Settings model stores everything in one document
+    const updates = req.body;
+    delete updates._id;
+    delete updates.__v;
+    
+    const settings = await Settings.findOneAndUpdate(
+      {},
+      { $set: updates },
+      { new: true, upsert: true }
+    );
+    res.status(200).json({ success: true, message: "Settings updated", data: settings });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -98,8 +107,13 @@ export const updateSettings = async (req, res) => {
 
 export const manageEmailTemplates = async (req, res) => {
   try {
-    const { name, subject, body } = req.body;
-    await EmailTemplate.findOneAndUpdate({ name }, { subject, body }, { upsert: true });
+    const { key, subject, html, body } = req.body;
+    const templateKey = key || req.params?.key;
+    await EmailTemplate.findOneAndUpdate(
+      { name: templateKey },
+      { subject, body: html || body },
+      { upsert: true, new: true }
+    );
     res.status(200).json({ success: true, message: "Template updated" });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -115,10 +129,31 @@ export const getSettings = async (req, res) => {
   }
 };
 
+// Default templates when DB is empty
+const DEFAULT_TEMPLATES = [
+  { key: 'email_verified', name: 'email_verified', category: 'auth', subject: 'Email Verified ✅', body: '<p>Your email has been verified. Welcome!</p>', description: 'Sent after user clicks the email verification link' },
+  { key: 'forgot_password', name: 'forgot_password', category: 'auth', subject: 'Your password reset OTP - {{appName}}', body: '<p>Your OTP is: <strong>{{otp}}</strong>. Valid for 15 minutes.</p>', description: 'Sent when user requests password reset' },
+  { key: 'password_changed', name: 'password_changed', category: 'auth', subject: 'Password Changed Confirmation', body: '<p>Your password has been changed for {{appName}}.</p>', description: 'Sent after a successful password reset' },
+  { key: 'plan_activated', name: 'plan_activated', category: 'billing', subject: 'Your {{plan}} Plan is Active! 🎉', body: '<p>Your {{plan}} plan has been activated. Enjoy your enhanced features!</p>', description: 'Sent when payment is approved and plan is activated' },
+  { key: 'payment_rejected', name: 'payment_rejected', category: 'billing', subject: 'Payment Update', body: '<p>We could not verify your payment. Please contact support.</p>', description: 'Sent when admin rejects a payment' },
+  { key: 'monitor_down', name: 'monitor_down', category: 'monitoring', subject: '🔴 {{monitorName}} is DOWN', body: '<p>Your monitor <strong>{{monitorName}}</strong> at {{url}} is DOWN.</p>', description: 'Sent when a monitor goes down' },
+  { key: 'monitor_up', name: 'monitor_up', category: 'monitoring', subject: '✅ {{monitorName}} is back UP', body: '<p>Your monitor <strong>{{monitorName}}</strong> at {{url}} is back online.</p>', description: 'Sent when a monitor recovers' },
+];
+
 export const getEmailTemplates = async (req, res) => {
   try {
-    const templates = await EmailTemplate.find();
-    res.status(200).json({ success: true, data: templates });
+    const dbTemplates = await EmailTemplate.find();
+    // Merge DB overrides with defaults
+    const merged = DEFAULT_TEMPLATES.map(def => {
+      const override = dbTemplates.find(t => t.name === def.key);
+      return {
+        ...def,
+        subject: override?.subject || def.subject,
+        html: override?.body || def.body,
+        isCustom: !!override,
+      };
+    });
+    res.status(200).json({ success: true, data: merged });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

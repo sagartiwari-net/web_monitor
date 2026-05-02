@@ -124,7 +124,15 @@ const Admin = () => {
         setData(res.data || []);
       } else if (activeTab === 'email-templates') {
         const res = await apiClient.get('/admin/email-templates');
-        setEmailTemplatesData(res.data); // It returns { total, grouped: { auth, billing, monitoring } }
+        // Backend returns flat array - group them by category for display
+        const templates = res.data || [];
+        const grouped = {};
+        templates.forEach(t => {
+          const cat = t.category || 'other';
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(t);
+        });
+        setEmailTemplatesData({ total: templates.length, grouped, flat: templates });
       }
     } catch (err) {
       console.error(err);
@@ -226,27 +234,22 @@ const Admin = () => {
         email: user.email,
         password: '',
         role: user.role,
-        planType: user.plan?.type || 'FREE'
+        planType: (typeof user.plan === 'object' ? user.plan?.type : user.plan) || 'free'
       });
     } else {
       setEditingUser(null);
-      setUserFormData({ name: '', email: '', password: '', role: 'USER', planType: 'FREE' });
+      setUserFormData({ name: '', email: '', password: '', role: 'user', planType: 'free' });
     }
     setIsUserModalOpen(true);
   };
 
   // --- Email Template Handlers ---
   const handleEditTemplate = async (template) => {
-    try {
-      const res = await apiClient.get(`/admin/email-templates/${template.key}`);
-      const fullTemplate = res.data.template;
-      setEditingTemplate(fullTemplate);
-      setTemplateFormData({ subject: fullTemplate.subject, html: fullTemplate.html });
-      setTemplatePreview(null);
-      setTestEmail('');
-    } catch (err) {
-      alert(err.message || 'Failed to fetch template details');
-    }
+    // Template already has full data from the list call - no extra API call needed
+    setEditingTemplate(template);
+    setTemplateFormData({ subject: template.subject, html: template.html || template.body || '' });
+    setTemplatePreview(null);
+    setTestEmail('');
   };
 
   const handleSaveTemplate = async (e) => {
@@ -440,7 +443,7 @@ const Admin = () => {
                     <td className="font-medium">{u.name}</td>
                     <td className="text-slate-400">{u.email}</td>
                     <td><span className={`badge ${u.role === 'ADMIN' ? 'badge-elite' : 'badge-free'}`}>{u.role}</span></td>
-                    <td><span className={`badge badge-${(u.plan?.type || 'FREE').toLowerCase()}`}>{(u.plan?.type || 'FREE').toUpperCase()}</span></td>
+                    <td><span className={`badge badge-${(typeof u.plan === 'object' ? u.plan?.type : u.plan) || 'free'}`}>{((typeof u.plan === 'object' ? u.plan?.type : u.plan) || 'FREE').toUpperCase()}</span></td>
                     <td className="text-sm text-slate-400">{new Date(u.createdAt).toLocaleDateString()}</td>
                     <td>
                       <div className="flex gap-3">
@@ -701,10 +704,10 @@ const Admin = () => {
                 <div>
                   <label className="form-label">Plan Type</label>
                   <select className="form-input" value={userFormData.planType} onChange={e => setUserFormData({...userFormData, planType: e.target.value})}>
-                    <option value="FREE">FREE (3 Sites)</option>
-                    <option value="BASIC">BASIC (20 Sites)</option>
-                    <option value="PRO">PRO (100 Sites)</option>
-                    <option value="ENTERPRISE">ENTERPRISE (500 Sites)</option>
+                    <option value="free">FREE (3 Sites)</option>
+                    <option value="basic">BASIC (10 Sites)</option>
+                    <option value="pro">PRO (50 Sites)</option>
+                    <option value="elite">ELITE (200 Sites)</option>
                   </select>
                 </div>
               </div>
