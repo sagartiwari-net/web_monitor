@@ -3,6 +3,9 @@ import { protect, adminOnly } from "../middlewares/auth.middleware.js";
 import {
   getStats,
   getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
   updateSettings,
   getSettings,
   manageEmailTemplates,
@@ -22,6 +25,9 @@ router.use(adminOnly);
 
 router.get("/stats", getStats);
 router.get("/users", getUsers);
+router.post("/users", createUser);
+router.put("/users/:id", updateUser);
+router.delete("/users/:id", deleteUser);
 
 router.get("/settings", getSettings);
 router.put("/settings", updateSettings);

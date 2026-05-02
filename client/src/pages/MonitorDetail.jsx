@@ -27,9 +27,12 @@ const MonitorDetail = () => {
         apiClient.get(`/audit/${id}`).catch(() => ({ data: { audit: null } })),
         apiClient.get(`/logs/${id}?limit=90`).catch(() => ({ data: { logs: [] } })),
       ]);
-      setMonitor(monRes.data.monitor);
-      setAuditData(auditRes.data.audit);
-      setLogsData(logsRes.data.logs || []);
+      // Handle both response shapes
+      const monData = monRes.data?.monitor || monRes.monitor || monRes.data || monRes;
+      setMonitor(monData);
+      setAuditData(auditRes?.data?.audit || null);
+      const logsArr = logsRes?.data?.logs || logsRes?.logs || [];
+      setLogsData(logsArr);
     } catch (err) {
       alert(err.message || 'Failed to fetch monitor details');
       navigate('/dashboard');

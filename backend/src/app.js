@@ -9,6 +9,9 @@ import paymentRoutes from "./router/payment.routes.js";
 import adminRoutes from "./router/admin.routes.js";
 import aiRoutes from "./router/ai.routes.js";
 import seoRoutes from "./router/seo.routes.js";
+import { protect } from "./middlewares/auth.middleware.js";
+import Log from "./models/log.model.js";
+import Monitor from "./models/monitor.model.js";
 
 const app = express();
 
@@ -23,6 +26,28 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/seo", seoRoutes);
+
+// Inline logs route for monitor detail page
+app.get("/api/logs/:monitorId", protect, async (req, res) => {
+  try {
+    const { monitorId } = req.params;
+    const limit = parseInt(req.query.limit) || 90;
+    const monitor = await Monitor.findOne({ _id: monitorId, user: req.user._id });
+    if (!monitor) return res.status(404).json({ message: "Monitor not found" });
+    const logs = await Log.find({ monitor: monitorId }).sort("-createdAt").limit(limit);
+    res.status(200).json({ success: true, data: { logs } });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Inline audit stub route (returns empty if no audit service)
+app.get("/api/audit/:monitorId", protect, async (req, res) => {
+  res.status(200).json({ success: true, data: { audit: null } });
+});
+app.post("/api/audit/:monitorId", protect, async (req, res) => {
+  res.status(200).json({ success: false, message: "Audit service not configured" });
+});
 
 app.get("/", (req, res) => {
   res.send("Web Monitor SaaS API is running...");
