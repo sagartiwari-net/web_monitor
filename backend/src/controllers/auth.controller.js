@@ -2,6 +2,7 @@ import User from "../models/user.model.js";
 import { sendTokenResponse } from "../utils/token.util.js";
 import { OAuth2Client } from "google-auth-library";
 import { sendEmail } from "../utils/sendEmail.js";
+import bcrypt from "bcrypt";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -66,10 +67,8 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
+    await User.updateOne({ _id: user._id }, { $set: { isVerified: true, otp: null, otpExpiry: null } }, { runValidators: false });
     user.isVerified = true;
-    user.otp = null;
-    user.otpExpiry = null;
-    await user.save();
 
     res.status(200).json({
       success: true,
@@ -132,9 +131,7 @@ export const requestLoginOtp = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
     
-    user.otp = otp;
-    user.otpExpiry = otpExpiry;
-    await user.save();
+    await User.updateOne({ _id: user._id }, { $set: { otp, otpExpiry } }, { runValidators: false });
     
     try {
       await sendEmail({
@@ -167,10 +164,8 @@ export const verifyLoginOtp = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
     
-    user.otp = null;
-    user.otpExpiry = null;
-    if (!user.isVerified) user.isVerified = true;
-    await user.save();
+    await User.updateOne({ _id: user._id }, { $set: { otp: null, otpExpiry: null, isVerified: true } }, { runValidators: false });
+    user.isVerified = true;
     
     sendTokenResponse(user, 200, res, "Logged in via OTP");
   } catch (error) {
@@ -191,9 +186,7 @@ export const forgotPassword = async (req, res) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
 
-    user.otp = otp;
-    user.otpExpiry = otpExpiry;
-    await user.save();
+    await User.updateOne({ _id: user._id }, { $set: { otp, otpExpiry } }, { runValidators: false });
     try {
       await sendEmail({
         email: user.email,
@@ -231,10 +224,13 @@ export const resetPassword = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
-    user.password = newPassword;
-    user.otp = null;
-    user.otpExpiry = null;
-    await user.save();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { password: hashedPassword, otp: null, otpExpiry: null } },
+      { runValidators: false }
+    );
 
     res.status(200).json({
       success: true,
