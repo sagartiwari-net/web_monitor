@@ -153,7 +153,7 @@ const Signup = () => {
                   id="signup-name"
                   type="text"
                   required
-                  className="form-input pl-9"
+                  className="form-input !pl-10"
                   placeholder="John Doe"
                   value={form.fullname}
                   onChange={(e) => setForm({ ...form, fullname: e.target.value })}
@@ -170,7 +170,7 @@ const Signup = () => {
                   id="signup-email"
                   type="email"
                   required
-                  className="form-input pl-9"
+                  className="form-input !pl-10"
                   placeholder="you@example.com"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -188,7 +188,7 @@ const Signup = () => {
                   type={showPassword ? 'text' : 'password'}
                   required
                   minLength={6}
-                  className="form-input pl-9 pr-10"
+                  className="form-input !pl-10 !pr-10"
                   placeholder="Min 6 characters"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -230,7 +230,7 @@ const Signup = () => {
                   id="signup-confirm-password"
                   type={showPassword ? 'text' : 'password'}
                   required
-                  className={`form-input pl-9 pr-10 ${form.confirmPassword && form.password !== form.confirmPassword ? 'border-red-400' : ''}`}
+                  className={`form-input !pl-10 !pr-10 ${form.confirmPassword && form.password !== form.confirmPassword ? 'border-red-400' : ''}`}
                   placeholder="Repeat your password"
                   value={form.confirmPassword}
                   onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}

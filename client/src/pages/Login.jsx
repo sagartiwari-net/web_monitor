@@ -217,7 +217,7 @@ const Login = () => {
                     id="login-email"
                     type="email"
                     required
-                    className="form-input pl-9"
+                    className="form-input !pl-10"
                     placeholder="you@example.com"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -248,7 +248,7 @@ const Login = () => {
                     id="login-password"
                     type={showPassword ? 'text' : 'password'}
                     required
-                    className="form-input pl-9 pr-10"
+                    className="form-input !pl-10 !pr-10"
                     placeholder="Min 6 characters"
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -289,7 +289,7 @@ const Login = () => {
                     type="email"
                     required
                     disabled={otpSent}
-                    className={`form-input pl-9 ${otpSent ? 'bg-slate-50 text-slate-500' : ''}`}
+                    className={`form-input !pl-10 ${otpSent ? 'bg-slate-50 text-slate-500' : ''}`}
                     placeholder="you@example.com"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
