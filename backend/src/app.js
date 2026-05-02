@@ -19,7 +19,7 @@ app.use(cors());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/monitors", monitorRoutes);
-app.use("/api/payments", paymentRoutes);
+app.use("/api/payment", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/seo", seoRoutes);
